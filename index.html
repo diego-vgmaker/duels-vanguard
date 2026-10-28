@@ -244,7 +244,7 @@ details summary { cursor: pointer; color: var(--ink); }
 
     <section class="panel stack">
       <h2>Settings</h2>
-      <label class="row" for="auto-boost"><input type="checkbox" id="auto-boost"> Boost automatically</label>
+      <label class="row" for="auto-boost"><input type="checkbox" id="auto-boost"> Always boost (skip the boost choice when attacking)</label>
       <div class="field-row">
         <label class="label" for="img-tpl">Card image source</label>
         <input id="img-tpl" type="text" inputmode="url" placeholder="https://example.com/cards/{folder}/{setl}_{no}.png" autocomplete="off">
@@ -773,7 +773,8 @@ details summary { cursor: pointer; color: var(--ink); }
     });
     add['082'] = U('082', 'Lightning Thief Monster, Jabattail', BG, 3, {
       race: 'Alien', verified: false,
-      text: '[CONT](RC): If your World is Abyssal Dark Night, this unit attacks all units in one of your opponent\'s columns.\n(Column attacks are not supported yet; in this simulator it attacks a single unit.)'
+      text: '[CONT](RC): If your World is Abyssal Dark Night, when this unit attacks, it attacks all of the units in one of your opponent\'s columns.',
+      abilities: [{ kind: 'CONT', zones: ['RC'], columnAttack: (g, x) => g.worldState(x.p) === 'abyssal' }]
     });
     add['083'] = U('083', 'Grapple External', BG, 2, {
       race: 'Alien',
@@ -1063,7 +1064,7 @@ details summary { cursor: pointer; color: var(--ink); }
       play: function* (g, x) {
         yield* g.buff(x.p, { power: 5000, until: 'battle', purpose: 'defend' });
         const b = g.battle;
-        const c = yield* g.chooseUnit(x.p, { rearOnly: true, filter: s => !b || s.u !== b.tUnit, title: 'Return a rear-guard that is not being attacked to your hand', purpose: 'bounce' });
+        const c = yield* g.chooseUnit(x.p, { rearOnly: true, filter: s => !b || !b.targets.includes(s.u), title: 'Return a rear-guard that is not being attacked to your hand', purpose: 'bounce' });
         if (c) { g.log(g.name(g.unitAt(x.p, c).c) + ' returns to hand.', x.p); g.removeUnit(x.p, c, 'hand'); }
       }
     });
@@ -1524,11 +1525,14 @@ details summary { cursor: pointer; color: var(--ink); }
       if (b.bUnit) { const bc = this.circOf(b.ap, b.bUnit); if (bc) v += this.power(b.ap, bc); }
       return v;
     }
-    defensePower() {
+    /* defense of one attacked unit: its power plus the guardians assigned to it */
+    defensePower(unit) {
       const b = this.battle; if (!b) return 0;
-      const tc = this.circOf(b.tp, b.tUnit); if (!tc) return 0;
-      return this.power(b.tp, tc) + this.totalShield(b.tp);
+      const u = unit || b.tUnit; const tc = this.circOf(b.tp, u); if (!tc) return 0;
+      const shield = this.P(b.tp).gc.filter(g => !g.for || g.for === u).reduce((s, g) => s + this.gcShield(g), 0);
+      return this.power(b.tp, tc) + shield;
     }
+    liveTargets() { const b = this.battle; return b ? b.targets.filter(u => this.circOf(b.tp, u)) : []; }
 
     /* ---------- rules check ---------- */
     checkRules() {
@@ -1999,11 +2003,34 @@ details summary { cursor: pointer; color: var(--ink); }
       }
     }
 
+    /* opponent's columns, seen from the attacker: L/R are the opponent's left/right */
+    columnCircles(col) { return col === 'C' ? ['VC', 'BC'] : col === 'L' ? ['FL', 'BL'] : ['FR', 'BR']; }
+    hasColumnAttack(p, circ, u) {
+      if (circ === 'VC') return false;
+      return (this.def(u.c).abilities || []).some(ab => ab.kind === 'CONT' && ab.columnAttack && this.zoneOk(ab, circ) && ab.columnAttack(this, { p, unit: u, circ }));
+    }
     attackActions(p) {
       const o = 1 - p; const acts = [];
+      const COLN = { L: 'left', C: 'center', R: 'right' };
       for (const a of FRONT) {
         const u = this.unitAt(p, a); if (!u || u.rested) continue;
-        for (const t of FRONT) { const tu = this.unitAt(o, t); if (tu) acts.push({ key: 'atk:' + a + ':' + t, kind: 'attack', a, t, id: u.c.id, label: this.name(u.c) + ' attacks ' + this.name(tu.c) }); }
+        const bu = this.unitAt(p, BEHIND[a]);
+        const canB = !!(bu && !bu.rested && this.canBoost(bu));
+        const push = (base) => {
+          if (canB) {
+            acts.push(Object.assign({}, base, { key: base.key + ':b', boost: true, booster: bu.c.id, label: base.label + ' (boost: ' + this.name(bu.c) + ')' }));
+            acts.push(Object.assign({}, base, { key: base.key + ':n', boost: false, label: base.label + ' (no boost)' }));
+          } else acts.push(Object.assign({}, base, { boost: false }));
+        };
+        if (this.hasColumnAttack(p, a, u)) {
+          for (const col of ['L', 'C', 'R']) {
+            const tus = this.columnCircles(col).filter(c => this.unitAt(o, c));
+            if (tus.length) push({ key: 'atk:' + a + ':col' + col, kind: 'attack', a, t: tus.includes('VC') ? 'VC' : tus[0], col, targets: tus, id: u.c.id,
+              label: this.name(u.c) + ' attacks the ' + COLN[col] + ' column (' + tus.map(c => this.name(this.unitAt(o, c).c)).join(' + ') + ')' });
+          }
+        } else {
+          for (const t of FRONT) { const tu = this.unitAt(o, t); if (tu) push({ key: 'atk:' + a + ':' + t, kind: 'attack', a, t, targets: [t], id: u.c.id, label: this.name(u.c) + ' attacks ' + this.name(tu.c) }); }
+        }
       }
       acts.push({ key: 'end', kind: 'end', label: 'End turn' });
       return acts;
@@ -2015,7 +2042,7 @@ details summary { cursor: pointer; color: var(--ink); }
         const ans = yield { type: 'attack', player: p, title: 'Battle Phase', actions: acts };
         const a = acts.find(x => x.key === ans);
         if (!a || a.kind === 'end') return;
-        yield* this._battle(p, a.a, a.t);
+        yield* this._battle(p, a.a, a.targets || [a.t], a.boost);
         this.pendingRetired = [];
       }
     }
@@ -2032,30 +2059,43 @@ details summary { cursor: pointer; color: var(--ink); }
       }
       for (const c of ['FL', 'FR']) {
         const u = pl.rc[c];
-        if (u && u !== b.tUnit && this.def(u.c).skill === 'intercept') acts.push({ key: 'i' + c, kind: 'intercept', circ: c, id: u.c.id, shield: this.def(u.c).shield || 0, label: 'Intercept with ' + this.name(u.c) });
+        if (u && !b.targets.includes(u) && this.def(u.c).skill === 'intercept') acts.push({ key: 'i' + c, kind: 'intercept', circ: c, id: u.c.id, shield: this.def(u.c).shield || 0, label: 'Intercept with ' + this.name(u.c) });
       }
       acts.push({ key: 'done', kind: 'done', label: 'Confirm guard' });
       return acts;
     }
-    *_battle(p, a, t) {
-      const o = 1 - p; const aUnit = this.unitAt(p, a); const tUnit = this.unitAt(o, t);
-      this.battle = { ap: p, tp: o, aUnit, tUnit, bUnit: null, targetIsVC: t === 'VC', drive: [], driveG3: false, hit: false };
+    /* choose which attacked unit a guardian protects (only asked when several units are attacked) */
+    *_guardFor(o) {
+      const ts = this.liveTargets(); if (ts.length <= 1) return ts[0] || this.battle.tUnit;
+      const items = ts.map(u => { const c = this.circOf(o, u); return { key: o + ':' + c, label: this.name(u.c) + ' (' + CIRC_PT[c] + ')', id: u.c.id, circ: c, owner: o }; });
+      const ans = yield { type: 'select', player: o, title: 'Which attacked unit does this guardian protect?', items, min: 1, max: 1, purpose: 'guardFor', owner: o };
+      const k = this._validKeys(ans, items, 1, 1)[0];
+      return this.unitAt(o, k.split(':')[1]);
+    }
+    *_battle(p, a, ts, boost) {
+      const o = 1 - p; const aUnit = this.unitAt(p, a);
+      if (!Array.isArray(ts)) ts = [ts];
+      const targets = ts.map(c => this.unitAt(o, c)).filter(Boolean);
+      const tUnit = targets.find(u => u === this.P(o).vc) || targets[0];
+      this.battle = { ap: p, tp: o, aUnit, tUnit, targets, bUnit: null, targetIsVC: targets.includes(this.P(o).vc), drive: [], driveG3: false, hit: false, hits: [] };
       aUnit.rested = true;
-      this.log(this.name(aUnit.c) + ' attacks ' + this.name(tUnit.c) + '!', p);
-      // boost
+      this.log(this.name(aUnit.c) + ' attacks ' + targets.map(u => this.name(u.c)).join(' + ') + '!', p);
+      // boost (chosen when the attack was declared; older callers are asked here)
       const bc = BEHIND[a]; const bu = this.unitAt(p, bc);
       if (bu && !bu.rested && this.canBoost(bu)) {
-        const ok = yield* this.yesno(p, 'Boost with ' + this.name(bu.c) + '?', 'boost', { id: bu.c.id });
+        const ok = boost == null ? yield* this.yesno(p, 'Boost with ' + this.name(bu.c) + '?', 'boost', { id: bu.c.id }) : boost;
         if (ok) { bu.rested = true; this.battle.bUnit = bu; this.log(this.name(bu.c) + ' boosts.', p); }
       }
       yield* this.fire('attack', {});
       if (a === 'VC' && this.battle) yield* this.fire('vcAttacks', {});
       if (this.battle.bUnit) { yield* this.fire('boost', {}); yield* this.fire('boosted', {}); }
       // guard step
-      if (this.circOf(p, aUnit) && this.circOf(o, tUnit)) {
+      if (this.circOf(p, aUnit) && this.liveTargets().length) {
         for (let k = 0; k < 60; k++) {
           const acts = this.guardActions(o);
-          const ans = yield { type: 'guard', player: o, title: 'Guard', actions: acts, atk: this.attackPower(), def: this.defensePower(), crit: this.crit(p, this.circOf(p, aUnit)) };
+          const live = this.liveTargets();
+          const defs = live.map(u => ({ circ: this.circOf(o, u), id: u.c.id, def: this.defensePower(u), noHit: !!u.noHit }));
+          const ans = yield { type: 'guard', player: o, title: 'Guard', actions: acts, atk: this.attackPower(), def: this.defensePower(), defs, crit: this.crit(p, this.circOf(p, aUnit)) };
           const g = acts.find(x => x.key === ans);
           if (!g || g.kind === 'done') break;
           const pl = this.P(o);
@@ -2063,19 +2103,21 @@ details summary { cursor: pointer; color: var(--ink); }
             let cs;
             if (g.kind === 'guard') cs = [pl.hand.find(x => x.iid === g.iid)];
             else cs = yield* this.selectCards(o, pl.hand.filter(c => this.def(c).type === 'unit'), { title: 'Call 2 or more guardians at once', min: 2, max: 99, purpose: 'guardMulti' });
+            const forU = yield* this._guardFor(o);
             const placed = [];
-            for (const c of cs) { this.take(pl.hand, c); const gu = { c, mods: [], owner: o }; pl.gc.push(gu); placed.push(gu); }
+            for (const c of cs) { this.take(pl.hand, c); const gu = { c, mods: [], owner: o, for: forU }; pl.gc.push(gu); placed.push(gu); }
             this.battle.handGuarded = true;
-            this.log(this.names[o] + ' guards with ' + cs.map(c => this.name(c)).join(', ') + '.', o);
+            this.log(this.names[o] + ' guards with ' + cs.map(c => this.name(c)).join(', ') + (live.length > 1 ? ' (protecting ' + this.name(forU.c) + ')' : '') + '.', o);
             for (const gu of placed) yield* this.fire('putOnGC', { p: o, g: gu });
           } else if (g.kind === 'blitz') {
             const c = pl.hand.find(x => x.iid === g.iid);
             yield* this.playOrder(o, c);
           } else {
+            const forU = yield* this._guardFor(o);
             const u = pl.rc[g.circ]; pl.rc[g.circ] = null;
             this.toZone(o, u.under, 'drop');
             if (u.c.token) this.log(this.name(u.c) + ' intercepts and vanishes.', o);
-            else { pl.gc.push({ c: u.c, mods: [], owner: o }); this.log(this.name(u.c) + ' intercepts.', o); }
+            else { pl.gc.push({ c: u.c, mods: [], owner: o, for: forU }); this.log(this.name(u.c) + ' intercepts.', o); }
           }
           this.checkRules();
         }
@@ -2100,14 +2142,21 @@ details summary { cursor: pointer; color: var(--ink); }
           if (this.def(c).trigger) yield* this.fire('driveTrigger', { p, card: c });
         }
       }
-      // damage step
-      const ac = this.circOf(p, aUnit); const tc = this.circOf(o, tUnit);
-      if (ac && tc) {
-        const atk = this.attackPower(); const df = this.defensePower();
-        const hit = atk >= df && !tUnit.noHit;
-        this.battle.hit = hit;
-        this.log((hit ? 'HIT' : (tUnit.noHit && atk >= df ? 'Blocked by sentinel' : 'Guarded')) + ' (' + fmt(atk) + ' vs ' + fmt(df) + ').', p);
-        if (hit) {
+      // damage step: each attacked unit is checked separately
+      const ac = this.circOf(p, aUnit);
+      if (ac) {
+        const atk = this.attackPower();
+        const live = this.liveTargets();
+        // vanguard last, so rear-guards are retired before damage checks
+        live.sort((x, y) => (x === this.P(o).vc) - (y === this.P(o).vc));
+        const results = live.map(u => ({ u, df: this.defensePower(u) }));
+        let anyHit = false;
+        for (const r of results) {
+          const tc = this.circOf(o, r.u); if (!tc) continue;
+          const hit = atk >= r.df && !r.u.noHit;
+          this.log((hit ? 'HIT' : (r.u.noHit && atk >= r.df ? 'Blocked by sentinel' : 'Guarded')) + (live.length > 1 ? ' ' + this.name(r.u.c) : '') + ' (' + fmt(atk) + ' vs ' + fmt(r.df) + ').', p);
+          if (!hit) continue;
+          anyHit = true; this.battle.hits.push(r.u);
           if (tc === 'VC') {
             const n = this.crit(p, ac);
             for (let i = 0; i < n; i++) {
@@ -2121,6 +2170,9 @@ details summary { cursor: pointer; color: var(--ink); }
               this.checkRules();
             }
           } else this.retire(o, tc, 'attack');
+        }
+        this.battle.hit = anyHit;
+        if (anyHit) {
           yield* this.fire('hit', {});
           if (this.battle.bUnit) yield* this.fire('boostHit', {});
         }
@@ -2130,7 +2182,7 @@ details summary { cursor: pointer; color: var(--ink); }
       if (this.battle.bUnit) yield* this.fire('boostEnd', {});
       yield* this.fire('battleEndVC', {});
       for (const pl of this.players) { for (const g of pl.gc) this.toZone(pl.idx, [g.c], 'drop'); pl.gc = []; }
-      if (tUnit) tUnit.noHit = false;
+      for (const u of targets) u.noHit = false;
       this.expire('battle');
       this.battle = null;
       this.checkRules();
@@ -2186,7 +2238,7 @@ details summary { cursor: pointer; color: var(--ink); }
           power: Object.fromEntries(CIRCS.map(c => [c, this.power(i, c)])), crit: Object.fromEntries(CIRCS.map(c => [c, this.crit(i, c)])),
           persona: this.tf.persona[i], orderZone: pl.orderZone.map(c => c.id), prison: pl.prison.map(c => c.id), world: this.worldState(i)
         })),
-        battle: this.battle && { ap: this.battle.ap, tp: this.battle.tp, a: this.circOf(this.battle.ap, this.battle.aUnit), t: this.circOf(this.battle.tp, this.battle.tUnit), b: this.battle.bUnit && this.circOf(this.battle.ap, this.battle.bUnit), atk: this.attackPower(), def: this.defensePower() }
+        battle: this.battle && { ap: this.battle.ap, tp: this.battle.tp, a: this.circOf(this.battle.ap, this.battle.aUnit), t: this.circOf(this.battle.tp, this.battle.tUnit), ts: this.liveTargets().map(u => this.circOf(this.battle.tp, u)), b: this.battle.bUnit && this.circOf(this.battle.ap, this.battle.bUnit), atk: this.attackPower(), def: this.defensePower() }
       };
     }
     totalCards(p) {
@@ -2361,7 +2413,11 @@ details summary { cursor: pointer; color: var(--ink); }
   }
 
   function attackMove(g, p, acts) {
-    const atks = acts.filter(a => a.kind === 'attack');
+    // always boost when possible; prefer column attacks that include the vanguard
+    const all = acts.filter(a => a.kind === 'attack');
+    const atks = all.filter(a => a.boost || !all.some(b => b.boost && b.a === a.a && (b.col || b.t) === (a.col || a.t)));
+    const colVC = atks.find(a => a.col && a.targets.length > 1 && a.targets.includes('VC'));
+    if (colVC && !atks.some(a => a.a === 'VC' && a.t === 'VC')) return colVC.key;
     if (!atks.length) return 'end';
     const vc = atks.find(a => a.a === 'VC' && a.t === 'VC'); if (vc) return vc.key;
     const toVC = atks.filter(a => a.t === 'VC');
@@ -2482,6 +2538,7 @@ details summary { cursor: pointer; color: var(--ink); }
         const t = items.find(i => g.db[i.id].name === 'Trickstar'); return pick(t ? [t].concat(items.filter(i => i !== t)) : items);
       }
       case 'mulligan': return [];
+      case 'guardFor': { const k = items.find(i => i.circ === 'VC'); return [(k || items[0]).key]; }
       case 'defend': {
         const b = g.battle; const tc = b && g.circOf(b.tp, b.tUnit); const k = p + ':' + tc;
         return [items.some(i => i.key === k) ? k : items[0].key];
@@ -2646,7 +2703,7 @@ details summary { cursor: pointer; color: var(--ink); }
   const OLD_OFFICIAL = 'https://en.cf-vanguard.com/wordpress/wp-content/images/cardlist/{setl}/{setl}_{no}.png';
   // products whose images share one folder on the official card list
   const IMG_FOLDER = { 'DZ-TD01': 'dztd01-06', 'DZ-TD02': 'dztd01-06', 'DZ-TD03': 'dztd01-06', 'DZ-TD04': 'dztd01-06', 'DZ-TD05': 'dztd01-06', 'DZ-TD06': 'dztd01-06' };
-  const settings = Object.assign({ img: OFFICIAL_IMG, autoBoost: true, speed: 'normal' }, store.get('settings2', {}));
+  const settings = Object.assign({ img: OFFICIAL_IMG, alwaysBoost: false, speed: 'normal' }, store.get('settings2', {}));
   if (settings.img === OLD_OFFICIAL) settings.img = OFFICIAL_IMG;
   const saveSettings = () => store.set('settings2', settings);
   const NAT = { 'Dragon Empire': 'DE', 'Keter Sanctuary': 'KS', 'Dark States': 'DS', 'Brandt Gate': 'BG', 'Stoicheia': 'ST' };
@@ -2738,13 +2795,13 @@ details summary { cursor: pointer; color: var(--ink); }
     const sel = store.get('lastDeck', valid[0] && valid[0].id);
     $('#my-deck').innerHTML = valid.map(d => '<option value="' + esc(d.id) + '"' + (d.id === sel ? ' selected' : '') + '>' + esc(d.name) + (d.pre ? ' · prebuilt' : '') + '</option>').join('');
     $('#bot-deck').innerHTML = '<option value="random">Random</option>' + prebuilt().map(d => '<option value="' + d.id + '">' + esc(d.name) + '</option>').join('');
-    $('#bot-speed').value = settings.speed; $('#auto-boost').checked = settings.autoBoost; $('#img-tpl').value = settings.img;
+    $('#bot-speed').value = settings.speed; $('#auto-boost').checked = !!settings.alwaysBoost; $('#img-tpl').value = settings.img;
     const r = store.get('rating', { r: 1000, w: 0, l: 0 });
     $('#home-rating').textContent = Math.round(r.r) + ' pts · ' + r.w + 'W ' + r.l + 'L';
     $('#fan').innerHTML = ['D-BT01/003', 'D-BT01/008', 'D-BT01/002'].map((id, i) => '<div class="card-slot" style="position:absolute;width:118px;left:calc(50% - 59px + ' + ((i - 1) * 70) + 'px);top:' + (i === 1 ? 0 : 18) + 'px;transform:rotate(' + ((i - 1) * 9) + 'deg)">' + cardHTML(id) + '</div>').join('');
   }
   $('#bot-speed').addEventListener('change', e => { settings.speed = e.target.value; saveSettings(); });
-  $('#auto-boost').addEventListener('change', e => { settings.autoBoost = e.target.checked; saveSettings(); });
+  $('#auto-boost').addEventListener('change', e => { settings.alwaysBoost = e.target.checked; saveSettings(); });
   $('#img-tpl').addEventListener('change', e => { settings.img = e.target.value.trim(); saveSettings(); toast(settings.img ? 'Image source saved.' : 'Using generated frames.'); });
   $('#img-official').addEventListener('click', () => { settings.img = OFFICIAL_IMG; $('#img-tpl').value = OFFICIAL_IMG; saveSettings(); toast('Official card list images enabled.'); });
   $('#play-bot').addEventListener('click', () => {
@@ -2791,7 +2848,7 @@ details summary { cursor: pointer; color: var(--ink); }
 
   function human(pr) {
     if (pr.type === 'yesno') {
-      if (pr.purpose === 'boost' && settings.autoBoost) { setTimeout(() => answer(true), 0); return; }
+      if (pr.purpose === 'boost' && settings.alwaysBoost) { setTimeout(() => answer(true), 0); return; }
       openSheet((pr.id ? '<div style="width:90px">' + cardHTML(pr.id) + '</div>' : '') + '<h3>' + esc(pr.title) + '</h3>' + (pr.cost ? '<p class="muted">Cost: ' + esc(pr.cost) + '</p>' : '') +
         '<div class="row"><button class="btn primary" id="yn-y">Yes</button><button class="btn" id="yn-n">No</button></div>', true);
       $('#yn-y').onclick = () => answer(true); $('#yn-n').onclick = () => answer(false);
@@ -2842,7 +2899,7 @@ details summary { cursor: pointer; color: var(--ink); }
     const hl = highlight(p, c); if (hl) cls.push(hl);
     const b = G.battle;
     if (b && u && b.aUnit === u) cls.push('attacking');
-    if (b && u && b.tUnit === u) cls.push('defending');
+    if (b && u && b.targets.includes(u)) cls.push('defending');
     if (u && u.rested) cls.push('rested');
     let inner = c === 'VC' ? 'VC' : 'RC';
     if (u) {
@@ -2877,7 +2934,7 @@ details summary { cursor: pointer; color: var(--ink); }
       if (p === H && pr.actions.some(a => (a.kind === 'call' || a.kind === 'od') && a.iid === s.hand && a.circ === c)) return 'can';
     }
     if (pr.type === 'attack') {
-      if (s && s.unit && p !== H && pr.actions.some(a => a.kind === 'attack' && a.a === s.unit && a.t === c)) return 'target';
+      if (s && s.unit && p !== H && attackChoices(pr, s.unit, c).length) return 'target';
       if (!s && p === H && pr.actions.some(a => a.kind === 'attack' && a.a === c)) return 'can';
     }
     if (pr.type === 'guard' && p === H && pr.actions.some(a => a.kind === 'intercept' && a.circ === c)) return 'can';
@@ -2946,9 +3003,18 @@ details summary { cursor: pointer; color: var(--ink); }
         const mv = pr.actions.find(a => a.kind === 'move' && a.col === col); if (mv) acts.push(['Move in column', mv.key, '']);
       }
       if (pr.type === 'attack' && s.unit) {
-        const vcA = pr.actions.find(a => a.kind === 'attack' && a.a === s.unit && a.t === 'VC');
-        if (vcA) acts.push(['Attack the vanguard', vcA.key, 'primary']);
-        if (pr.actions.some(a => a.kind === 'attack' && a.a === s.unit && a.t !== 'VC')) extra += '<p class="muted">Or tap an opponent rear-guard marked in red.</p>';
+        const mine2 = pr.actions.filter(a => a.kind === 'attack' && a.a === s.unit);
+        const isCol = mine2.some(a => a.col);
+        if (isCol) {
+          const seen = new Set();
+          for (const a of mine2) { if (seen.has(a.col)) continue; seen.add(a.col); acts.push([{ L: 'Attack left column', C: 'Attack center column', R: 'Attack right column' }[a.col] + ' (' + a.targets.length + ')', 'atk-col:' + a.col, a.targets.includes('VC') ? 'primary' : '']); }
+          extra += '<p class="muted">This unit attacks every unit in the chosen column.</p>';
+        } else {
+          if (attackChoices(pr, s.unit, 'VC').length) acts.push(['Attack the vanguard', 'atk-t:VC', 'primary']);
+          if (mine2.some(a => a.t !== 'VC')) extra += '<p class="muted">Or tap an opponent rear-guard marked in red.</p>';
+        }
+        const bz = mine2.find(a => a.boost);
+        if (bz) extra += '<p class="muted">Booster available: ' + esc(CARDS[bz.booster].name) + '. You will choose whether to boost.</p>';
       }
       if (pr.type === 'guard' && s.hand) { const a = pr.actions.find(x => x.iid === s.hand); if (a) acts.push(a.kind === 'blitz' ? ['Play blitz order', a.key, 'primary'] : ['Guard (+' + fmt(a.shield) + ')', a.key, 'primary']); }
       if (pr.type === 'guard' && s.unit) { const a = pr.actions.find(x => x.kind === 'intercept' && x.circ === s.unit); if (a) acts.push(['Intercept (+' + fmt(a.shield) + ')', a.key, 'primary']); }
@@ -2957,7 +3023,12 @@ details summary { cursor: pointer; color: var(--ink); }
     el.innerHTML = '<div>' + cardHTML(id) + '</div><div class="txt"><b>' + esc(d.name) + '</b><div class="muted" style="font-size:12px">' + esc(stats) + ' · ' + esc(d.set + '/' + d.no) + (d.verified ? '' : ' · summarized text') + '</div>' +
       '<div>' + esc(d.text) + '</div>' + extra + '<div class="acts">' + acts.map(a => '<button class="btn small ' + a[2] + '" data-k="' + esc(a[1]) + '">' + esc(a[0]) + '</button>').join('') + '<button class="btn small" id="d-x">Close</button></div></div>';
     el.hidden = false;
-    el.querySelectorAll('[data-k]').forEach(b => b.onclick = () => answer(b.dataset.k));
+    el.querySelectorAll('[data-k]').forEach(b => b.onclick = () => {
+      const k = b.dataset.k;
+      if (k.startsWith('atk-col:')) return declareAttack(G.prompt.actions.filter(a => a.kind === 'attack' && a.a === ui.sel.unit && a.col === k.slice(8)));
+      if (k.startsWith('atk-t:')) return declareAttack(attackChoices(G.prompt, ui.sel.unit, k.slice(6)));
+      answer(k);
+    });
     $('#d-x').onclick = () => { ui.sel = null; render(); };
   }
 
@@ -2982,6 +3053,7 @@ details summary { cursor: pointer; color: var(--ink); }
       const gap = pr.atk - pr.def;
       const need = gap >= 0 ? (Math.floor(gap / 5000) + 1) * 5000 : 0;
       hint = 'Guard: ⚔ ' + fmt(pr.atk) + ' × 🛡 ' + fmt(pr.def) + (need ? ' — ' + fmt(need) + ' more shield needed to block.' : ' — attack blocked (before drive checks).');
+      if (pr.defs && pr.defs.length > 1) hint = 'Column attack ⚔ ' + fmt(pr.atk) + ' vs ' + pr.defs.map(d => CARDS[d.id].name + ' 🛡 ' + fmt(d.def) + (d.noHit ? ' (cannot be hit)' : '')).join(' · ') + '. Each guardian protects one unit you choose.';
       const gm = pr.actions.find(a => a.kind === 'guardMulti');
       if (gm) { hint += ' You must call two or more guardians at once.'; btns.push(['Guard with 2+', gm.key, '']); }
       btns.push(['Confirm guard', 'done', 'primary']);
@@ -3017,7 +3089,7 @@ details summary { cursor: pointer; color: var(--ink); }
         if (call) return answer(call.key);
       }
       if (mine && pr.type === 'attack') {
-        if (ui.sel && ui.sel.unit && p !== H) { const a = pr.actions.find(x => x.kind === 'attack' && x.a === ui.sel.unit && x.t === c); if (a) return answer(a.key); }
+        if (ui.sel && ui.sel.unit && p !== H) { const list = attackChoices(pr, ui.sel.unit, c); if (list.length) return declareAttack(list); }
         if (p === H && pr.actions.some(a => a.kind === 'attack' && a.a === c)) { ui.sel = { unit: c, p: H }; render(); return; }
       }
       if (u && !u.faceDown) { ui.sel = p === H ? { unit: c, p } : { view: c, p }; render(); }
@@ -3026,6 +3098,25 @@ details summary { cursor: pointer; color: var(--ink); }
   });
   $('#game').addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('circ')) { e.preventDefault(); e.target.click(); } });
 
+  /* attack actions of one attacker that hit the tapped circle (single target or its column) */
+  function attackChoices(pr, a, c) {
+    return pr.actions.filter(x => x.kind === 'attack' && x.a === a && (x.col ? x.targets.includes(c) : x.t === c));
+  }
+  /* boost is declared together with the attack: ask unless "always boost" is on */
+  function declareAttack(list) {
+    if (!list.length) return;
+    const withB = list.find(a => a.boost), without = list.find(a => !a.boost);
+    if (!withB || !without) return answer(list[0].key);
+    if (settings.alwaysBoost) return answer(withB.key);
+    const pr = G.prompt; const bcirc = { VC: 'BC', FL: 'BL', FR: 'BR' }[withB.a];
+    const bp = G.power(H, bcirc), ap = G.power(H, withB.a);
+    openSheet('<div style="width:90px">' + cardHTML(withB.booster) + '</div><h3>Boost with ' + esc(CARDS[withB.booster].name) + '?</h3>' +
+      '<p class="muted">With boost: ' + fmt(ap + bp) + ' power, and the booster is rested. Without boost: ' + fmt(ap) + ' power, and the booster stays standing.</p>' +
+      '<div class="row"><button class="btn primary" id="bst-y">Boost (' + fmt(ap + bp) + ')</button><button class="btn" id="bst-n">Don\'t boost (' + fmt(ap) + ')</button><button class="btn small" id="bst-c">Cancel</button></div>', true);
+    $('#bst-y').onclick = () => { closeSheet(); answer(withB.key); };
+    $('#bst-n').onclick = () => { closeSheet(); answer(without.key); };
+    $('#bst-c').onclick = () => { closeSheet(); ui.sel = null; render(); };
+  }
   function showZone(p, z) {
     const pl = G.P(p); let cards = []; let title = '';
     if (z === 'deck') { openSheet('<h3>Deck</h3><p class="muted">' + pl.deck.length + ' cards left (order hidden).</p><button class="btn" id="zx">Close</button>'); $('#zx').onclick = closeSheet; return; }
