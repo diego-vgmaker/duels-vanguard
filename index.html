@@ -597,7 +597,7 @@ details summary { cursor: pointer; color: var(--ink); }
       const pl = g.P(x.p); pl.perm.vgBuff = (pl.perm.vgBuff || 0) + 1; g.log('For the rest of the game, ' + g.names[x.p] + '\'s vanguard gets +10000 and critical +1 during their turn.', x.p);
     });
     add['032'] = U('032', 'Phantasma Magician, Curtis', DS, 3, {
-      verified: false,
+      race: 'Elf',
       text: '[AUTO]: When this unit is placed on (RC), if your vanguard is "Master of Gravity, Baromagnes", Soul-Charge 2.\n[ACT](RC): If you have ten or more cards in your soul, [COST: CB2], your front row units get +5000 until end of turn.',
       abilities: [
         { kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'Soul-Charge 2', cond: (g, x) => vgName(g, x.p) === 'Master of Gravity, Baromagnes', resolve: function* (g, x) { g.soulCharge(x.p, 2); } },
@@ -614,18 +614,19 @@ details summary { cursor: pointer; color: var(--ink); }
       ]
     });
     add['034'] = U('034', 'Shadow Leak Magician', DS, 2, {
-      untargetableRC: true, verified: false,
+      race: 'Elf',
+      untargetableRC: true,
       text: '[CONT](RC): This unit cannot be chosen by your opponent\'s card effects.'
     });
     add['035'] = U('035', 'Protobulb Dragon', DS, 1, {
-      verified: false,
+      race: 'Gear Dragon',
       text: '[AUTO](RC): When this unit attacks or boosts, if you are in "Final Rush", [COST: CB1 & put another rear-guard into your soul], choose a card from your soul and put it into your hand.\n(Final Rush comes from other sets.)',
       abilities: ['attack', 'boost'].map(on => ({ kind: 'AUTO', on, zones: ['RC'], label: 'Soul card to hand', cost: { cb: 1, otherToSoul: 1 }, cond: (g, x) => g.tf.finalRush[x.p] && g.P(x.p).soul.length > 0,
         resolve: function* (g, x) { const cs = yield* g.chooseFromZone(x.p, 'soul', { title: 'Choose a card from your soul', min: 1, max: 1, purpose: 'fromSoul' }); takeToHand(g, x.p, cs, 'soul'); } }))
     });
     add['036'] = U('036', 'Recusal Hate Dragon', DS, 1, { power: 6000, shield: 0, sentinel: true, text: SENT_BT_TEXT, abilities: [sentinelBT] });
     add['037'] = ORD('037', 'Crawl, you "Insects"!', DS, 3, 'normal', {
-      cost: { cb: 1 }, verified: false,
+      cost: { cb: 1 },
       text: 'Normal Order. Play with [COST: CB1]. Soul-Charge 1, choose one of your units, it gets +10000 until end of turn for every five cards in your soul. Then, if you have ten or more cards in your soul, draw 1.',
       play: function* (g, x) {
         g.soulCharge(x.p, 1);
@@ -740,7 +741,7 @@ details summary { cursor: pointer; color: var(--ink); }
       g.log('Front row power and critical doubled!', x.p);
     });
     add['038'] = U('038', 'Granaroad Fairtigar', BG, 3, {
-      verified: false,
+      race: 'Battleroid',
       text: '[ACT](RC)[1/turn]: [COST: SB1], this unit gets +2000 until end of turn, then choose one of your opponent\'s front row rear-guards and imprison it.' + PRISON_NOTE,
       abilities: [{ kind: 'ACT', zones: ['RC'], oncePerTurn: true, label: '+2000 and imprison', cost: { sb: 1 },
         resolve: function* (g, x) {
@@ -751,7 +752,7 @@ details summary { cursor: pointer; color: var(--ink); }
         } }]
     });
     add['039'] = U('039', 'Cardinal Noid, Cubisia', BG, 2, {
-      race: 'Cyberoid', verified: false,
+      race: 'Cyberoid',
       text: '[AUTO](VC): When a World card is put into your order zone, choose one of your units; it gets +5000 until end of turn.\n[CONT](RC): During your turn, if your World is Abyssal Dark Night, this unit gets +5000.',
       abilities: [
         { kind: 'AUTO', on: 'enterOrderZone', zones: ['VC'], label: 'A unit +5000', cond: (g, x) => x.subject && g.def(x.subject).world, resolve: function* (g, x) { yield* g.buff(x.p, { power: 5000 }); } },
@@ -759,12 +760,12 @@ details summary { cursor: pointer; color: var(--ink); }
       ]
     });
     add['040'] = U('040', 'Polar Cold Monster, Drumler', BG, 2, {
-      verified: false,
+      race: 'Alien',
       text: '[AUTO]: When this unit is placed on (RC), if your World is Abyssal Dark Night, [COST: CB1 & SB1], draw 1.',
       abilities: [{ kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'Draw 1', cost: { cb: 1, sb: 1 }, cond: (g, x) => world(g, x) === 'abyssal', resolve: function* (g, x) { g.draw(x.p, 1); } }]
     });
     add['041'] = U('041', 'Fighting Dragon, Goldog Dragon', BG, 2, {
-      verified: false,
+      race: 'Space Dragon',
       text: '[AUTO]: When this card is discarded from your hand during your turn, if you have a set order in your order zone, [COST: CB1], call this card to (RC).',
       abilities: [{ kind: 'AUTO', on: 'discarded', label: 'Call this card from the drop', cost: { cb: 1 },
         cond: (g, x) => g.active === x.p && g.P(x.p).orderZone.length > 0 && g.P(x.p).drop.includes(x.card) && g.def(x.card).grade <= g.vgGrade(x.p),
@@ -772,7 +773,7 @@ details summary { cursor: pointer; color: var(--ink); }
     });
     add['042'] = U('042', 'Violate Dragon', BG, 1, { power: 6000, shield: 0, sentinel: true, text: SENT_BT_TEXT, abilities: [sentinelBT] });
     add['043'] = ORD('043', 'Hollowing Moonlit Night', BG, 2, 'set', {
-      world: true, cost: { sb: 1 }, verified: false,
+      world: true, cost: { sb: 1 },
       text: 'Set Order (World). Play with [COST: SB1].\n[AUTO]: When this card is put into your order zone, draw 1.\n[CONT](Order Zone): If your order zone only has World cards: one World card makes your World "Dark Night"; two or more make it "Abyssal Dark Night".',
       abilities: [{ kind: 'AUTO', on: 'enterOrderZone', label: 'Draw 1', cond: (g, x) => x.subject === x.self, resolve: function* (g, x) { g.draw(x.p, 1); } }]
     });
@@ -851,18 +852,18 @@ details summary { cursor: pointer; color: var(--ink); }
       g.tf.rcDrive[x.p] = true; g.log('Rear-guards also drive check this turn!', x.p);
     });
     add['044'] = U('044', 'Dark Strain Dragon', KS, 3, {
-      verified: false,
+      race: 'Abyss Dragon',
       text: '[ACT](RC): If you have three or more grade 3 units, [COST: SB2], all of your grade 3 units get [Boost] until end of turn.',
       abilities: [{ kind: 'ACT', zones: ['RC'], label: 'Grade 3 units gain Boost', cost: { sb: 2 }, cond: (g, x) => g3Units(g, x.p) >= 3,
         resolve: function* (g, x) { for (const s of g.units(x.p)) if (g.def(s.u.c).grade === 3) g.addMod(s.u, { boost: true, until: 'turn' }); } }]
     });
     add['045'] = U('045', 'Big Snake Witch, Solaria', KS, 3, {
-      verified: false,
+      race: 'Human',
       text: '[AUTO]: When this card is discarded from your hand during your turn, [COST: CB1 & SB1], draw 1.',
       abilities: [{ kind: 'AUTO', on: 'discarded', label: 'Draw 1', cost: { cb: 1, sb: 1 }, cond: (g, x) => g.active === x.p, resolve: function* (g, x) { g.draw(x.p, 1); } }]
     });
     add['046'] = U('046', 'Pentagleam Sorceress', KS, 2, {
-      race: 'Human', verified: false,
+      race: 'Human',
       text: '[AUTO]: When this unit is rode upon by "Hexaorb Sorceress", look at the top three cards of your deck and put them back in any order.\n[AUTO]: When this unit is placed on (RC), look at the top card of your deck and put it on the top or bottom; if you put it on the bottom, this unit gets +2000 until end of turn.',
       abilities: [
         { kind: 'AUTO', on: 'rodeUpon', label: 'Rearrange the top three', cond: rodeBy('Hexaorb Sorceress'),
@@ -875,13 +876,13 @@ details summary { cursor: pointer; color: var(--ink); }
       ]
     });
     add['047'] = U('047', 'Divine Sister, Tartine', KS, 1, {
-      verified: false,
+      race: 'Elf',
       text: '[AUTO]: When this unit is placed on (RC), [COST: SB1 & rest this unit], look at the top two cards of your deck, put one on top and the other on the bottom.',
       abilities: [{ kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'Look at the top two', cost: { sb: 1, restSelf: true },
         resolve: function* (g, x) { yield* g.arrangeTop(x.p, 2, { minTop: 1, maxTop: 1, title: 'Choose the card to keep on top' }); } }]
     });
     add['048'] = U('048', 'Divine Sister, Faciata', KS, 1, {
-      verified: false,
+      race: 'Elf',
       text: '[AUTO](RC)[1/turn]: When your drive check reveals a trigger unit, [COST: SB2], Counter-Charge 1.',
       abilities: [{ kind: 'AUTO', on: 'driveTrigger', zones: ['RC'], oncePerTurn: true, label: 'Counter-Charge 1', cost: { sb: 2 }, resolve: function* (g, x) { g.counterCharge(x.p, 1); } }]
     });
@@ -928,8 +929,8 @@ details summary { cursor: pointer; color: var(--ink); }
     add['104'] = T('104', 'White Crow Sorcerer, Taxus', KS, 'front', 'Human');
     add['105'] = T('105', 'Circuling Sorceress', KS, 'heal', 'Human');
     add['106'] = ORD('106', 'Downswing of Sword of Judgement', KS, 3, 'normal', {
-      cost: { sb: 1 }, verified: false,
-      text: 'Normal Order. Play with [COST: SB1]. Choose one of your opponent\'s rear-guards; your opponent puts all of their rear-guards in that column on the bottom of their deck.',
+      cost: { sbG3: 1 },
+      text: 'Normal Order. Play with [COST: Soul Blast 1 grade 3 card]. Choose one of your opponent\'s rear-guards; your opponent puts all of their rear-guards in that column on the bottom of their deck.',
       canPlay: (g, x) => oppRGs(g, x).length > 0,
       play: function* (g, x) {
         const c = yield* g.chooseUnit(x.p, { owner: opp(x), rearOnly: true, title: 'Choose a rear-guard (its whole column goes to the bottom of the deck)', purpose: 'retire', alwaysAsk: true });
@@ -992,7 +993,7 @@ details summary { cursor: pointer; color: var(--ink); }
       if (pl.damage.length > 0 && pl.damage.length >= g.P(opp(x)).damage.length) { const h = pl.damage.splice(pl.damage.length - 1, 1)[0]; pl.drop.push(h.c); g.log('Heals 1 damage!', x.p); }
     });
     add['050'] = U('050', 'Black Tears Husk Dragon', ST, 2, {
-      verified: false,
+      race: 'Skeleton',
       text: '[AUTO]: When this unit is placed on (VC), you may choose a normal order from your drop and put it into your hand.\n[CONT](RC): If you played an order this turn, this unit gets +5000.',
       abilities: [
         { kind: 'AUTO', on: 'placedVC', zones: ['VC'], label: 'Normal order from drop to hand', cond: (g, x) => g.P(x.p).drop.some(c => g.def(c).order === 'normal'),
@@ -1011,20 +1012,21 @@ details summary { cursor: pointer; color: var(--ink); }
     });
     add['052'] = U('052', 'Planar Prevent Dragon', ST, 1, { power: 6000, shield: 0, sentinel: true, text: SENT_BT_TEXT, abilities: [sentinelBT] });
     add['053'] = ORD('053', 'Cursed Souls Squirming in Agony', ST, 3, 'normal', {
-      cost: { sb: 2 }, verified: false,
+      cost: { sb: 2 },
       text: 'Normal Order. Play with [COST: SB2]. Look at the top four cards of your deck, call up to one unit from among them to (RC), and put the rest into your drop. If this was played with Alchemagic, call up to two instead, and they get +5000 until end of turn.',
       play: function* (g, x) { yield* lookTopCall(g, x.p, 4, { max: x.alchemagic ? 2 : 1, power: x.alchemagic ? 5000 : 0, rest: 'drop', replace: true, title: 'Call ' + (x.alchemagic ? 'up to two units' : 'up to one unit') }); }
     });
     add['054'] = ORD('054', 'Grief, Despair, and Rejection', ST, 3, 'normal', {
-      cost: { cb: 1 }, verified: false,
-      text: 'Normal Order. Play with [COST: CB1]. Choose up to three of your units; they get +10000 until end of turn.',
+      cost: { cb: 1 },
+      text: 'Normal Order. Play with [COST: CB1]. If your vanguard is "Mysterious Rain Spiritualist, Zorga", choose three of your units; they get +10000 until end of turn.',
       play: function* (g, x) {
+        if (vgName(g, x.p) !== 'Mysterious Rain Spiritualist, Zorga') { g.log('Your vanguard is not Zorga, so nothing happens.', x.p); return; }
         const chosen = [];
         for (let i = 0; i < 3; i++) { const u = yield* g.buff(x.p, { power: 10000, title: '+10000: choose a unit (' + (i + 1) + '/3)', filter: s => !chosen.includes(s.u) }); if (!u) break; chosen.push(u); }
       }
     });
     add['055'] = ORD('055', 'Spiritual Body Condensation', ST, 1, 'normal', {
-      cost: { sb: 1 }, verified: false,
+      cost: { sb: 1 },
       text: 'Normal Order. Play with [COST: SB1]. Choose a unit card from your drop with a grade equal to or less than your vanguard\'s, call it to (RC), and it gets +5000 until end of turn.',
       canPlay: (g, x) => g.P(x.p).drop.some(c => g.def(c).type === 'unit' && g.def(c).grade <= g.vgGrade(x.p)),
       play: function* (g, x) {
@@ -1037,8 +1039,8 @@ details summary { cursor: pointer; color: var(--ink); }
       text: '[AUTO](RC): When this unit attacks, [COST: CB1], it gets +5000 until end of turn.',
       abilities: [{ kind: 'AUTO', on: 'attack', zones: ['RC'], label: '+5000', cost: { cb: 1 }, resolve: function* (g, x) { g.addMod(x.unit, { power: 5000, until: 'turn' }); } }]
     });
-    add['109'] = U('109', 'Hydraulic Ram Dragon', ST, 3, {
-      verified: false,
+    add['109'] = U('109', 'Hydrolic Ram Dragon', ST, 3, {
+      race: 'Tear Dragon',
       text: '[AUTO](RC): When this unit attacks a vanguard, if you have an order card in your bind zone, it gets +5000 until end of that battle.\n(Order cards used through Alchemagic go to the bind zone.)',
       abilities: [{ kind: 'AUTO', on: 'attack', zones: ['RC'], label: '+5000', cond: (g, x) => g.battle.targetIsVC && g.P(x.p).bind.some(c => g.def(c).type === 'order'),
         resolve: function* (g, x) { g.addMod(x.unit, { power: 5000, until: 'battle' }); } }]
@@ -1060,7 +1062,7 @@ details summary { cursor: pointer; color: var(--ink); }
       ]
     });
     add['112'] = U('112', 'Conspiring Mutant, Admantis', ST, 1, {
-      verified: false,
+      race: 'Insect',
       text: '[AUTO]: When this unit is placed on (RC), choose another of your rear-guards; it gets +5000 until end of turn.',
       abilities: [{ kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'Another rear-guard +5000', cond: (g, x) => g.rearguards(x.p).some(r => r.u !== x.unit),
         resolve: function* (g, x) { yield* g.buff(x.p, { power: 5000, rearOnly: true, filter: s => s.u !== x.unit }); } }]
@@ -1603,6 +1605,7 @@ details summary { cursor: pointer; color: var(--ink); }
       let sb = cost.sb || 0;
       if (cost.cb && this.faceUpDamage(p) < cost.cb) return false;
       if (sb && pl.soul.length < sb) return false;
+      if (cost.sbG3 && pl.soul.filter(c => this.def(c).grade === 3).length < cost.sbG3 + 0) return false;
       const handN = pl.hand.filter(c => !exclude || !exclude.includes(c)).length;
       if (cost.discard && handN < cost.discard + (cost.handToSoul || 0)) return false;
       if (cost.handToSoul && handN < cost.handToSoul) return false;
@@ -1617,7 +1620,7 @@ details summary { cursor: pointer; color: var(--ink); }
     }
     costText(cost) {
       if (!cost) return 'no cost'; const t = [];
-      if (cost.cb) t.push('CB' + cost.cb); if (cost.sb) t.push('SB' + cost.sb);
+      if (cost.cb) t.push('CB' + cost.cb); if (cost.sb) t.push('SB' + cost.sb); if (cost.sbG3) t.push('SB' + cost.sbG3 + ' (grade 3)');
       if (cost.discard) t.push('discard ' + cost.discard); if (cost.reveal) t.push('reveal ' + cost.reveal.n + ' ' + cost.reveal.label);
       if (cost.restRG) t.push('rest ' + cost.restRG + ' rear-guard' + (cost.restRG > 1 ? 's' : ''));
       if (cost.otherToSoul) t.push('another rear-guard into soul');
@@ -1638,6 +1641,12 @@ details summary { cursor: pointer; color: var(--ink); }
       }
       if (cost.cb) this.counterBlast(p, cost.cb);
       if (cost.sb) yield* this.soulBlast(p, cost.sb);
+      if (cost.sbG3) {
+        const pool = pl0.soul.filter(c => this.def(c).grade === 3);
+        const cs = pool.length <= cost.sbG3 ? pool.slice(0, cost.sbG3) : yield* this.selectCards(p, pool, { title: 'Soul Blast ' + cost.sbG3 + ': choose a grade 3 card from your soul', min: cost.sbG3, max: cost.sbG3, purpose: 'soulblast' });
+        for (const c of cs) { this.take(pl0.soul, c); pl0.drop.push(c); }
+        this.log(this.names[p] + ': Soul-Blast ' + cs.length + ' (grade 3).', p);
+      }
       if (cost.discard) yield* this.discard(p, cost.discard, 'Cost: discard ' + cost.discard, exclude);
       if (cost.handToSoul) {
         const cs = yield* this.selectCards(p, pl0.hand.filter(c => !exclude || !exclude.includes(c)), { title: 'Cost: put ' + cost.handToSoul + ' card from your hand into your soul', min: cost.handToSoul, max: cost.handToSoul, purpose: 'discard' });
@@ -2394,7 +2403,7 @@ details summary { cursor: pointer; color: var(--ink); }
         case 'Causality Goes Crazy as I Will It': if (pl.soul.length >= 3) return a.key; break;
         case 'Downswing of Sword of Judgement': if (g.rearguards(o).length >= 2) return a.key; break;
         case 'Cursed Souls Squirming in Agony': if (g.emptyRC(p).length >= 1 && pl.soul.length >= 3) return a.key; break;
-        case 'Grief, Despair, and Rejection': if (fu >= 2 && g.units(p).length >= 4) return a.key; break;
+        case 'Grief, Despair, and Rejection': if (fu >= 2 && g.units(p).length >= 4 && g.name(pl.vc.c) === 'Mysterious Rain Spiritualist, Zorga') return a.key; break;
         case 'Spiritual Body Condensation': if (g.emptyRC(p).length >= 1) return a.key; break;
       }
     }
