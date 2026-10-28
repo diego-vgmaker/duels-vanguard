@@ -193,6 +193,7 @@ details summary { cursor: pointer; color: var(--ink); }
 </head>
 <body>
 
+
 <header class="top">
   <div class="wrap">
     <span class="logo">duels.<b>vanguard</b></span>
@@ -238,7 +239,7 @@ details summary { cursor: pointer; color: var(--ink); }
       <label class="row" for="auto-boost"><input type="checkbox" id="auto-boost"> Boost automatically</label>
       <div class="field-row">
         <label class="label" for="img-tpl">Card image source</label>
-        <input id="img-tpl" type="text" inputmode="url" placeholder="https://example.com/cards/{setl}/{setl}_{no}.png" autocomplete="off">
+        <input id="img-tpl" type="text" inputmode="url" placeholder="https://example.com/cards/{folder}/{setl}_{no}.png" autocomplete="off">
         <div class="row"><button class="btn small" id="img-official">Use official card list images</button></div>
         <span class="muted" style="font-size:12px">Placeholders: {set} (D-SD01), {setl} (dsd01), {no} (001), {id}. Leave empty for generated frames. External images load when this page is hosted on your own site; the claude.ai preview blocks them, so use an image pack there.</span>
       </div>
@@ -1600,8 +1601,12 @@ details summary { cursor: pointer; color: var(--ink); }
     get(k, d) { try { const v = localStorage.getItem('dv:' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem('dv:' + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } }
   };
-  const OFFICIAL_IMG = 'https://en.cf-vanguard.com/wordpress/wp-content/images/cardlist/{setl}/{setl}_{no}.png';
+  const OFFICIAL_IMG = 'https://en.cf-vanguard.com/wordpress/wp-content/images/cardlist/{folder}/{setl}_{no}.png';
+  const OLD_OFFICIAL = 'https://en.cf-vanguard.com/wordpress/wp-content/images/cardlist/{setl}/{setl}_{no}.png';
+  // products whose images share one folder on the official card list
+  const IMG_FOLDER = { 'DZ-TD01': 'dztd01-06', 'DZ-TD02': 'dztd01-06', 'DZ-TD03': 'dztd01-06', 'DZ-TD04': 'dztd01-06', 'DZ-TD05': 'dztd01-06', 'DZ-TD06': 'dztd01-06' };
   const settings = Object.assign({ img: OFFICIAL_IMG, autoBoost: true, speed: 'normal' }, store.get('settings2', {}));
+  if (settings.img === OLD_OFFICIAL) settings.img = OFFICIAL_IMG;
   const saveSettings = () => store.set('settings2', settings);
   const NAT = { 'Dragon Empire': 'DE', 'Keter Sanctuary': 'KS' };
   const H = 0; // human seat
@@ -1635,7 +1640,22 @@ details summary { cursor: pointer; color: var(--ink); }
     return fillTpl(settings.img, d);
   }
   function fillTpl(tpl, d) {
-    return tpl.replace(/\{set\}/g, d.set).replace(/\{setl\}/g, d.set.toLowerCase().replace(/-/g, '')).replace(/\{no\}/g, d.no).replace(/\{id\}/g, d.id);
+    const setl = d.set.toLowerCase().replace(/-/g, '');
+    return tpl.replace(/\{folder\}/g, IMG_FOLDER[d.set] || setl).replace(/\{set\}/g, d.set).replace(/\{setl\}/g, d.set.toLowerCase().replace(/-/g, '')).replace(/\{no\}/g, d.no).replace(/\{id\}/g, d.id);
+  }
+  /* the official site files trial-deck cards in shared folders that are not always predictable,
+     so try a short chain of known layouts before giving up */
+  function officialAlts(d) {
+    const setl = d.set.toLowerCase().replace(/-/g, '');
+    const base = 'https://en.cf-vanguard.com/wordpress/wp-content/images/cardlist/';
+    const folders = [IMG_FOLDER[d.set] || setl, setl];
+    if (/^dztd0[1-6]$/.test(setl)) folders.push('dztd01-dztd06', 'dztd');
+    const out = [];
+    for (const f of folders) for (const suf of ['', 'en']) {
+      const u = base + f + '/' + setl + '_' + d.no + suf + '.png';
+      if (!out.includes(u)) out.push(u);
+    }
+    return out;
   }
   function glyph(name) { const w = name.split(/[ ,]+/).filter(Boolean); return (w[w.length - 1] || '?').slice(0, 2).toUpperCase(); }
   function cardHTML(id, o) {
@@ -1645,7 +1665,7 @@ details summary { cursor: pointer; color: var(--ink); }
     const tag = d.trigger ? '<span class="tg ' + d.trigger + '">' + TRIG_PT[d.trigger] + '</span>' : d.sentinel ? '<span class="tg sent">Sentinel</span>' : d.type === 'order' ? '<span class="tg ord">Order</span>' : '';
     const url = imgUrl(d);
     let alt = '';
-    if (url && !packUrl[d.id] && settings.img === OFFICIAL_IMG) alt = fillTpl(OFFICIAL_IMG.replace('.png', 'en.png'), d);
+    if (url && !packUrl[d.id] && settings.img === OFFICIAL_IMG) alt = officialAlts(d).filter(u => u !== url).join('|');
     const img = url ? '<img class="scan" src="' + esc(url) + '"' + (alt ? ' data-alt="' + esc(alt) + '"' : '') + ' alt="' + esc(d.name) + '" loading="lazy" referrerpolicy="no-referrer" onload="this.classList.add(\'ok\')" onerror="dvImgFail(this)">' : '';
     const pw = d.type === 'order' ? '' : '<div class="pw"><span>' + (d.power / 1000) + 'k</span>' + (d.crit > 1 ? '<span>★' + d.crit + '</span>' : '') + '</div>';
     const sh = d.type === 'order' || !d.shield ? '' : '<span class="sh">' + (d.shield / 1000) + 'k</span>';
@@ -1654,7 +1674,11 @@ details summary { cursor: pointer; color: var(--ink); }
       '<div class="nm">' + esc(d.name) + pw + '</div>' + img + '</div>';
   }
 
-  window.dvImgFail = img => { const a = img.dataset.alt; if (a) { img.removeAttribute('data-alt'); img.src = a; } else img.remove(); };
+  window.dvImgFail = img => {
+    const list = (img.dataset.alt || '').split('|').filter(Boolean);
+    if (list.length) { const next = list.shift(); if (list.length) img.dataset.alt = list.join('|'); else img.removeAttribute('data-alt'); img.src = next; }
+    else img.remove();
+  };
   /* ---------------- views / nav ---------------- */
   const views = { play: 'view-home', decks: 'view-decks', cards: 'view-cards', ranking: 'view-rank' };
   function route() {
@@ -2114,5 +2138,6 @@ details summary { cursor: pointer; color: var(--ink); }
   route();
 })();
 </script>
+
 </body>
 </html>
