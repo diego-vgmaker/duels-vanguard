@@ -300,6 +300,47 @@ details summary { cursor: pointer; color: var(--ink); font-weight: 600; }
 .legal { font-size: 12px; color: var(--ink-dim); border-top: 1px solid var(--line); margin-top: 28px; padding-block: 16px 28px; display: grid; gap: 6px; }
 .legal p { margin: 0; max-width: 90ch; }
 .legal a { color: var(--gold); }
+
+/* pressed filter pills */
+.btn[aria-pressed="true"] { background: var(--gold); color: var(--gold-ink); border-color: var(--gold); }
+
+/* deck builder pool */
+.pool .it { gap: 8px; }
+.pool .pc { position: relative; cursor: pointer; border-radius: var(--r-card); transition: box-shadow .15s; }
+.pool .it.in .pc { box-shadow: 0 0 0 2px var(--gold); }
+.pool .cnt { position: absolute; z-index: 3; right: -6px; bottom: -6px; font-family: var(--f-display); font-weight: 800; font-size: 13px; background: var(--gold); color: var(--gold-ink); padding: 1px 8px; border-radius: 999px; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+.pool .rd { position: absolute; z-index: 3; left: -6px; bottom: -6px; font-size: 11px; font-weight: 700; background: var(--you); color: #061426; padding: 1px 8px; border-radius: 999px; }
+.qty { background: var(--mat); border: 1px solid var(--line); border-radius: 999px; padding: 2px; }
+.qty button { width: 26px; height: 26px; border: 0; background: transparent; color: var(--ink); }
+.qty button:hover { background: var(--mat-2); }
+.qty .star { color: var(--ink-dim); font-size: 14px; }
+.qty .star.on { color: var(--you); }
+#b-ride { gap: 8px; }
+.rslot { width: 64px; aspect-ratio: 63 / 88; border-radius: var(--r-card); border: 1.5px dashed var(--line-2); display: grid; place-items: center; font-size: 8px; color: var(--ink-dim); text-align: center; }
+.rslot .card { font-size: 8px; }
+.rslot:has(.card) { border: 0; }
+.rslot.crest { opacity: .8; }
+
+/* card list */
+.cgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr)); gap: 12px; margin-top: 10px; }
+.cgrid .it { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 14px; align-items: start; padding: 14px; border-radius: 18px; background: rgba(20, 26, 60, .55); border: 1px solid var(--line); }
+.cgrid .it .card { font-size: 9px; }
+.cgrid h3 { font-size: 16px; }
+.cgrid .meta { font-size: 12px; margin-top: 2px; }
+.cgrid .ctext { white-space: pre-line; margin: 8px 0 0; font-size: 13px; line-height: 1.5; }
+
+/* ranking */
+.rating { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
+.rating .ring { width: 150px; height: 150px; border-radius: 50%; display: grid; place-content: center; text-align: center;
+  border: 2px solid rgba(240, 195, 90, .55); box-shadow: 0 0 40px rgba(240, 195, 90, .16), inset 0 0 30px rgba(240, 195, 90, .08); }
+.rating .ring b { font-family: var(--f-display); font-weight: 800; font-size: 40px; line-height: 1; color: var(--gold); }
+.rating .ring span { font-size: 12px; color: var(--ink-dim); }
+.rating dl { display: flex; gap: 28px; margin: 0; flex-wrap: wrap; }
+.rating dt { font-size: 13px; color: var(--ink-dim); }
+.rating dd { margin: 0; font-family: var(--f-display); font-size: 28px; font-weight: 700; }
+#rank-hist table.rank { background: rgba(20, 26, 60, .55); border-radius: 18px; overflow: hidden; }
+table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
+@media (max-width: 760px) { .rslot { width: 54px; } #b-ride { gap: 6px; flex-wrap: nowrap; } }
 </style>
 </head>
 <body>
@@ -404,7 +445,8 @@ details summary { cursor: pointer; color: var(--ink); font-weight: 600; }
     <button class="btn small" data-f="all">All</button><button class="btn small" data-f="DE">Dragon Empire</button><button class="btn small" data-f="DS">Dark States</button><button class="btn small" data-f="BG">Brandt Gate</button><button class="btn small" data-f="KS">Keter Sanctuary</button><button class="btn small" data-f="ST">Stoicheia</button><button class="btn small" data-f="NN">Nationless</button>
   </div>
   <div class="field-row" style="margin-top:10px;max-width:360px"><label class="label" for="cards-q">Search</label><input id="cards-q" type="search" placeholder="Card name"></div>
-  <div class="stack" id="cards-grid" style="margin-top:14px"></div>
+  <p class="muted" id="cards-count" style="margin:12px 0 0;font-size:13px"></p>
+  <div class="cgrid" id="cards-grid"></div>
 </main>
 
 <main id="view-rank" class="wrap" hidden>
@@ -3908,7 +3950,8 @@ details summary { cursor: pointer; color: var(--ink); font-weight: 600; }
   /* ---------------- ranking ---------------- */
   function renderRank() {
     const r = store.get('rating', { r: 1000, w: 0, l: 0 }); const h = store.get('history', []);
-    $('#rank-sum').innerHTML = '<div class="row"><span class="logo" style="font-size:34px">' + Math.round(r.r) + '</span><span class="chip">' + r.w + ' wins</span><span class="chip">' + r.l + ' losses</span></div>';
+    const games = r.w + r.l; const wr = games ? Math.round(100 * r.w / games) + '%' : '—';
+    $('#rank-sum').innerHTML = '<div class="rating"><div class="ring"><b>' + Math.round(r.r) + '</b><span>rating</span></div><dl><div><dt>Wins</dt><dd>' + r.w + '</dd></div><div><dt>Losses</dt><dd>' + r.l + '</dd></div><div><dt>Win rate</dt><dd>' + wr + '</dd></div></dl></div>';
     $('#rank-hist').innerHTML = h.length ? '<div style="overflow-x:auto"><table class="rank"><thead><tr><th>Date</th><th>Result</th><th>Your deck</th><th>Bot</th><th>Turns</th><th>Pts</th></tr></thead><tbody>' +
       h.map(x => '<tr><td>' + new Date(x.t).toLocaleDateString('en-US') + '</td><td>' + (x.res === 'V' ? '<span class="ok">Win</span>' : x.res === 'E' ? 'Draw' : 'Loss') + '</td><td>' + esc(x.mine) + '</td><td>' + esc(x.bot) + '</td><td>' + x.turns + '</td><td>' + (x.delta >= 0 ? '+' : '') + x.delta + '</td></tr>').join('') + '</tbody></table></div>'
       : '<p class="muted">No matches yet. Play the bot to start your history.</p>';
@@ -3922,7 +3965,8 @@ details summary { cursor: pointer; color: var(--ink); font-weight: 600; }
   }
   function renderCards() {
     const list = poolCards(cardFilter, $('#cards-q').value);
-    $('#cards-grid').innerHTML = list.map(d => '<div class="it" style="display:grid;grid-template-columns:96px minmax(0,1fr);gap:10px;align-items:start"><div>' + cardHTML(d.id) + '</div><div style="min-width:0"><b>' + esc(d.name) + '</b><div class="muted" style="font-size:12px">' + esc(d.set + '/' + d.no) + ' · ' + esc(d.nation || 'Nationless') + ' · Grade ' + d.grade + esc((d.icon ? ' · ' + (d.icon === 'aichi' ? 'Aichi icon' : d.icon === 'kai' ? 'Kai icon' : d.icon) : '')) + (d.verified ? '' : ' · <span title="Ability summary still needs checking against the printed card">summarized text</span>') + (d.partialName ? ' · <span title="Only part of the printed card name is known so far">short name</span>' : '') + '</div><p style="white-space:pre-line;margin:6px 0 0;font-size:13px">' + esc(d.text) + '</p></div></div>').join('');
+    $('#cards-count').textContent = list.length + ' card' + (list.length === 1 ? '' : 's');
+    $('#cards-grid').innerHTML = list.map(d => '<article class="it"><div>' + cardHTML(d.id) + '</div><div style="min-width:0"><h3>' + esc(d.name) + '</h3><div class="muted meta">' + esc(d.set + '/' + d.no) + ' · ' + esc(d.nation || 'Nationless') + ' · Grade ' + d.grade + esc((d.icon ? ' · ' + (d.icon === 'aichi' ? 'Aichi icon' : d.icon === 'kai' ? 'Kai icon' : d.icon) : '')) + (d.verified ? '' : ' · <span title="Ability summary still needs checking against the printed card">summarized text</span>') + (d.partialName ? ' · <span title="Only part of the printed card name is known so far">short name</span>' : '') + '</div><p class="ctext">' + esc(d.text) + '</p></div></article>').join('');
     document.querySelectorAll('#cards-filter button').forEach(b => b.setAttribute('aria-pressed', b.dataset.f === cardFilter ? 'true' : 'false'));
   }
   document.querySelectorAll('#cards-filter button').forEach(b => b.addEventListener('click', () => { cardFilter = b.dataset.f; renderCards(); }));
@@ -3940,8 +3984,9 @@ details summary { cursor: pointer; color: var(--ink); font-weight: 600; }
     $('#b-pool').innerHTML = poolCards(bFilter, q).filter(d => d.type !== 'crest').map(d => {
       const n = edit.total[d.id] || 0; const inRide = edit.ride.includes(d.id);
       const canRide = d.type === 'unit' && d.grade <= 3;
-      return '<div class="it"><div data-info="' + d.id + '">' + cardHTML(d.id) + '</div><div class="qty"><button data-m="' + d.id + '" aria-label="Remove ' + esc(d.name) + '">−</button><b>' + n + '</b><button data-a="' + d.id + '" aria-label="Add ' + esc(d.name) + '">+</button></div>' +
-        (canRide ? '<button class="btn small' + (inRide ? ' primary' : '') + '" data-r="' + d.id + '">' + (inRide ? '★ Ride' : 'Ride') + '</button>' : '') + '</div>';
+      return '<div class="it' + (n ? ' in' : '') + '"><div class="pc" data-info="' + d.id + '">' + cardHTML(d.id) + (n ? '<span class="cnt">×' + n + '</span>' : '') + (inRide ? '<span class="rd">Ride</span>' : '') + '</div>' +
+        '<div class="qty"><button data-m="' + d.id + '" aria-label="Remove ' + esc(d.name) + '">−</button><b>' + n + '</b><button data-a="' + d.id + '" aria-label="Add ' + esc(d.name) + '">+</button>' +
+        (canRide ? '<button class="star' + (inRide ? ' on' : '') + '" data-r="' + d.id + '" aria-pressed="' + inRide + '" aria-label="' + (inRide ? 'Remove from' : 'Put in') + ' ride deck" title="Ride deck">★</button>' : '') + '</div></div>';
     }).join('');
     document.querySelectorAll('#b-filter button').forEach(b => b.setAttribute('aria-pressed', b.dataset.f === bFilter ? 'true' : 'false'));
     // deck side
@@ -3952,7 +3997,7 @@ details summary { cursor: pointer; color: var(--ink); font-weight: 600; }
     const mainN = total - edit.ride.length;
     $('#b-sum').innerHTML = '<span class="chip">Main deck ' + mainN + '/50</span><span class="chip">Ride deck ' + edit.ride.length + '/4 + Energy Generator</span><span class="chip">' + trig + '/16 triggers</span>' + byG.map((n, g) => '<span class="chip">G' + g + ': ' + n + '</span>').join('');
     const rideSorted = edit.ride.slice().sort((a, b) => CARDS[a].grade - CARDS[b].grade);
-    $('#b-ride').innerHTML = [0, 1, 2, 3].map(g => { const id = rideSorted.find(x => CARDS[x].grade === g); return '<div style="width:64px;font-size:8px">' + (id ? cardHTML(id) : '<div class="circ" style="max-height:none">G' + g + '</div>') + '</div>'; }).join('');
+    $('#b-ride').innerHTML = [0, 1, 2, 3].map(g => { const id = rideSorted.find(x => CARDS[x].grade === g); return '<div class="rslot">' + (id ? cardHTML(id) : '<span>Grade ' + g + '</span>') + '</div>'; }).join('') + '<div class="rslot crest">' + cardHTML(edit.crest || 'DZ-SS13/005') + '</div>';
     $('#b-list').innerHTML = ids.map(id => '<div class="ln"><b>' + edit.total[id] + '×</b><span class="chip">G' + CARDS[id].grade + '</span><span>' + esc(CARDS[id].name) + '</span><span class="muted">' + (CARDS[id].trigger ? TRIG_PT[CARDS[id].trigger] : '') + '</span></div>').join('') || '<p class="muted">Empty deck. Add cards with the "+" buttons.</p>';
     const errs = deckErrors(edit);
     $('#b-errs').innerHTML = errs.length ? errs.map(e => '<div>• ' + esc(e) + '</div>').join('') : '<div class="ok">Deck is legal for Standard.</div>';
