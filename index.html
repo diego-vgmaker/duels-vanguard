@@ -606,7 +606,7 @@ details summary { cursor: pointer; color: var(--ink); }
       ]
     });
     add['033'] = U('033', 'Electro Spartan', DS, 2, {
-      verified: false,
+      race: 'Human',
       text: '[AUTO]: When this unit is rode upon by "Master of Gravity, Baromagnes", [COST: put a card from your hand into your soul], draw 1 and Soul-Charge 1.\n[AUTO]: When this unit is placed on (RC), [COST: CB1], Soul-Charge 2.',
       abilities: [
         { kind: 'AUTO', on: 'rodeUpon', label: 'Draw 1 and Soul-Charge 1', cost: { handToSoul: 1 }, cond: rodeBy('Master of Gravity, Baromagnes'), resolve: function* (g, x) { g.draw(x.p, 1); g.soulCharge(x.p, 1); } },
