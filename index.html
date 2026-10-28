@@ -1316,6 +1316,7 @@ details summary { cursor: pointer; color: var(--ink); }
       ]
     });
     a['009'] = U13('009', 'Cerrgaon', KS, 1, {
+      icon: null, clan: null, reprintOf: 'D-PR/389EN',
       race: 'High Beast',
       text: '[AUTO](RC): When this unit boosts, if you have more rear-guards than your opponent or you played an order this turn, it gets +5000 until end of that battle, and at the end of that battle, [COST: retire this unit], look at the top two cards of your deck, put one into your hand and the other on the bottom of your deck.',
       abilities: [
@@ -3637,7 +3638,7 @@ details summary { cursor: pointer; color: var(--ink); }
       if (pr.type === 'guard' && s.hand) { const a = pr.actions.find(x => x.iid === s.hand); if (a) acts.push(a.kind === 'blitz' ? ['Play blitz order', a.key, 'primary'] : ['Guard (+' + fmt(a.shield) + ')', a.key, 'primary']); }
       if (pr.type === 'guard' && s.unit) { const a = pr.actions.find(x => x.kind === 'intercept' && x.circ === s.unit); if (a) acts.push(['Intercept (+' + fmt(a.shield) + ')', a.key, 'primary']); }
     }
-    const stats = d.type === 'order' ? 'Order · grade ' + d.grade : 'Grade ' + d.grade + ' · ' + fmt(d.power) + ' power · ' + fmt(d.shield) + ' shield' + (d.skill ? ' · ' + ({ boost: 'Boost', intercept: 'Intercept', twin: 'Twin Drive', triple: 'Triple Drive' })[d.skill] : '');
+    const stats = d.type === 'order' ? 'Order · grade ' + d.grade : 'Grade ' + d.grade + ' · ' + fmt(d.power) + ' power · ' + fmt(d.shield) + ' shield' + (d.skill ? ' · ' + ({ boost: 'Boost', intercept: 'Intercept', twin: 'Twin Drive', triple: 'Triple Drive' })[d.skill] : '') + (d.icon ? ' · ' + (d.icon === 'aichi' ? 'Aichi icon' : d.icon === 'kai' ? 'Kai icon' : d.icon) : '');
     el.innerHTML = '<div>' + cardHTML(id) + '</div><div class="txt"><b>' + esc(d.name) + '</b><div class="muted" style="font-size:12px">' + esc(stats) + ' · ' + esc(d.set + '/' + d.no) + (d.verified ? '' : ' · summarized text') + '</div>' +
       '<div>' + esc(d.text) + '</div>' + extra + '<div class="acts">' + acts.map(a => '<button class="btn small ' + a[2] + '" data-k="' + esc(a[1]) + '">' + esc(a[0]) + '</button>').join('') + '<button class="btn small" id="d-x">Close</button></div></div>';
     el.hidden = false;
@@ -3797,7 +3798,7 @@ details summary { cursor: pointer; color: var(--ink); }
   }
   function renderCards() {
     const list = poolCards(cardFilter, $('#cards-q').value);
-    $('#cards-grid').innerHTML = list.map(d => '<div class="it" style="display:grid;grid-template-columns:96px minmax(0,1fr);gap:10px;align-items:start"><div>' + cardHTML(d.id) + '</div><div style="min-width:0"><b>' + esc(d.name) + '</b><div class="muted" style="font-size:12px">' + esc(d.set + '/' + d.no) + ' · ' + esc(d.nation || 'Nationless') + ' · Grade ' + d.grade + (d.verified ? '' : ' · <span title="Ability summary still needs checking against the printed card">summarized text</span>') + (d.partialName ? ' · <span title="Only part of the printed card name is known so far">short name</span>' : '') + '</div><p style="white-space:pre-line;margin:6px 0 0;font-size:13px">' + esc(d.text) + '</p></div></div>').join('');
+    $('#cards-grid').innerHTML = list.map(d => '<div class="it" style="display:grid;grid-template-columns:96px minmax(0,1fr);gap:10px;align-items:start"><div>' + cardHTML(d.id) + '</div><div style="min-width:0"><b>' + esc(d.name) + '</b><div class="muted" style="font-size:12px">' + esc(d.set + '/' + d.no) + ' · ' + esc(d.nation || 'Nationless') + ' · Grade ' + d.grade + esc((d.icon ? ' · ' + (d.icon === 'aichi' ? 'Aichi icon' : d.icon === 'kai' ? 'Kai icon' : d.icon) : '')) + (d.verified ? '' : ' · <span title="Ability summary still needs checking against the printed card">summarized text</span>') + (d.partialName ? ' · <span title="Only part of the printed card name is known so far">short name</span>' : '') + '</div><p style="white-space:pre-line;margin:6px 0 0;font-size:13px">' + esc(d.text) + '</p></div></div>').join('');
     document.querySelectorAll('#cards-filter button').forEach(b => b.setAttribute('aria-pressed', b.dataset.f === cardFilter ? 'true' : 'false'));
   }
   document.querySelectorAll('#cards-filter button').forEach(b => b.addEventListener('click', () => { cardFilter = b.dataset.f; renderCards(); }));
