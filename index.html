@@ -163,7 +163,7 @@ button.zone { text-align: left; }
 
 /* deck builder */
 .builder { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; margin-top: 12px; }
-@media (max-width: 760px) { .builder { grid-template-columns: 1fr; } .hero { grid-template-columns: 1fr; } .fan { display: none; } }
+@media (max-width: 760px) { .builder { grid-template-columns: minmax(0, 1fr); } .hero { grid-template-columns: 1fr; } .fan { display: none; } }
 .pool { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
 .pool .it { display: grid; gap: 4px; font-size: 11px; }
 .pool .it .card { font-size: 10px; cursor: pointer; }
@@ -197,6 +197,9 @@ details summary { cursor: pointer; color: var(--ink); }
 .gamelegal { margin: 2px 0 0; text-align: center; font-size: 10px; color: var(--ink-dim); opacity: .8; }
 
 .pick .textpick { display: flex; align-items: center; justify-content: center; min-height: 64px; border: 1px dashed var(--line, #444); border-radius: 10px; padding: 8px; }
+.builder > *, .builder aside > * { min-width: 0; }
+.builder .row { flex-wrap: wrap; }
+.builder #b-load { max-width: 100%; }
 </style>
 </head>
 <body>
@@ -1098,15 +1101,15 @@ details summary { cursor: pointer; color: var(--ink); }
     const B = n => S + '/' + n;
     const deck = (name, ride, counts) => { const c = {}; for (const k in counts) c[B(k)] = counts[k]; return { name, ride: ride.map(B), counts: c }; };
     DECKS.eugene = deck('Eugene (Dragon Empire)', ['062', '060', '027', '002'],
-      { '002': 3, '026': 2, '028': 4, '030': 3, '057': 3, '058': 2, '012': 3, '061': 3, '031': 4, '067': 1, '068': 2, '063': 4, '064': 4, '065': 4, '066': 4 });
+      { '002': 3, '026': 2, '028': 4, '030': 3, '057': 3, '058': 2, '059': 2, '029': 2, '012': 3, '061': 3, '031': 4, '067': 1, '068': 2, '063': 4, '064': 4, '065': 4, '066': 4 });
     DECKS.baromagnes = deck('Baromagnes (Dark States)', ['076', '075', '033', '003'],
-      { '003': 3, '032': 3, '069': 4, '070': 3, '034': 2, '015': 4, '072': 2, '074': 3, '036': 4, '037': 2, '077': 4, '078': 4, '079': 4, '080': 4 });
+      { '003': 3, '032': 3, '069': 4, '070': 3, '034': 2, '015': 4, '072': 2, '071': 2, '073': 2, '074': 3, '036': 4, '037': 2, '077': 4, '078': 4, '079': 4, '080': 4 });
     DECKS.orfist = deck('Orfist (Brandt Gate)', ['087', '084', '039', '005'],
-      { '005': 3, '082': 1, '040': 4, '041': 3, '039': 2, '018': 4, '085': 2, '086': 2, '042': 4, '043': 2, '094': 2, '092': 1, '088': 4, '089': 4, '090': 4, '091': 4 });
+      { '005': 3, '082': 1, '040': 4, '041': 3, '039': 2, '018': 4, '085': 4, '086': 4, '042': 4, '043': 2, '094': 2, '092': 1, '088': 4, '089': 4, '090': 4, '091': 4 });
     DECKS.hexaorb = deck('Hexaorb (Keter Sanctuary)', ['101', '099', '046', '008'],
-      { '008': 3, '096': 3, '097': 2, '098': 4, '045': 2, '047': 3, '048': 3, '021': 2, '049': 4, '106': 2, '107': 2, '102': 4, '103': 4, '104': 4, '105': 4 });
+      { '008': 3, '096': 3, '097': 2, '098': 4, '100': 2, '044': 2, '045': 2, '047': 3, '048': 3, '021': 2, '049': 4, '106': 2, '107': 2, '102': 4, '103': 4, '104': 4, '105': 4 });
     DECKS.zorga = deck('Zorga (Stoicheia)', ['113', '111', '050', '009'],
-      { '009': 3, '108': 3, '109': 2, '010': 3, '023': 3, '024': 3, '051': 2, '112': 2, '052': 4, '053': 2, '054': 1, '055': 2, '114': 4, '115': 4, '116': 4, '117': 4 });
+      { '009': 3, '108': 3, '109': 2, '010': 3, '023': 3, '024': 3, '051': 4, '112': 2, '110': 2, '052': 4, '053': 2, '054': 1, '055': 2, '114': 4, '115': 4, '116': 4, '117': 4 });
   }
   if (typeof module !== 'undefined' && module.exports) module.exports = install; else root.VGCardsBT01 = install;
 })(this);
@@ -1313,22 +1316,22 @@ details summary { cursor: pointer; color: var(--ink); }
       ]
     });
     a['009'] = U13('009', 'Cerrgaon', KS, 1, {
-      race: 'High Beast', verified: false,
-      text: '[AUTO](RC): When this unit boosts, if you have more rear-guards than your opponent or you played an order this turn, it gets +5000 until end of that battle.\n[AUTO](RC): At the end of the battle this unit boosted, [COST: retire this unit], look at the top two cards of your deck, put one into your hand and the other on the bottom of your deck.',
+      race: 'High Beast',
+      text: '[AUTO](RC): When this unit boosts, if you have more rear-guards than your opponent or you played an order this turn, it gets +5000 until end of that battle, and at the end of that battle, [COST: retire this unit], look at the top two cards of your deck, put one into your hand and the other on the bottom of your deck.',
       abilities: [
         { kind: 'AUTO', on: 'boost', zones: ['RC'], label: '+5000', cond: (g, x) => g.rearguards(x.p).length > g.rearguards(opp(x)).length || g.tf.orderThisTurn[x.p],
-          resolve: function* (g, x) { g.addMod(x.unit, { power: 5000, until: 'battle' }); } },
-        { kind: 'AUTO', on: 'boostEnd', zones: ['RC'], label: 'Look at the top two, one to hand', cost: { retireSelf: true },
+          resolve: function* (g, x) { g.addMod(x.unit, { power: 5000, until: 'battle' }); x.unit.armed = true; } },
+        { kind: 'AUTO', on: 'boostEnd', zones: ['RC'], label: 'Look at the top two, one to hand', cost: { retireSelf: true }, cond: (g, x) => !!x.unit.armed,
           resolve: function* (g, x) {
-            const pl = g.P(x.p); const cs = pl.deck.splice(0, Math.min(2, pl.deck.length)); pl.trig.push(...cs);
+            x.unit.armed = false; const pl = g.P(x.p); const cs = pl.deck.splice(0, Math.min(2, pl.deck.length)); pl.trig.push(...cs);
             const pick = yield* g.selectCards(x.p, cs, { title: 'Put one of these into your hand', min: 1, max: 1, purpose: 'search' });
             for (const c of cs) { g.take(pl.trig, c); if (pick.includes(c)) pl.hand.push(c); else pl.deck.push(c); }
           } }
       ]
     });
     a['010'] = U13('010', 'Little Sage, Marron', KS, 1, {
-      race: 'Giant', verified: false,
-      text: '[AUTO]: When this unit is placed on (VC), [COST: SB1 (no SB if you rode it from your hand) & reveal a grade 3 with an Aichi icon from your ride deck], during your next ride phase you may ride from your ride deck without discarding.\n[AUTO]: When this unit is placed on (RC), if you have a vanguard with an Aichi icon, [COST: put a non-sentinel normal unit with the same clan from your drop on the bottom of your deck], it gets +5000 until end of turn.',
+      race: 'Giant',
+      text: '[AUTO]: When this unit is placed on (VC), [COST: SB1 (no SB if you rode it from your hand) & reveal a grade 3 with an Aichi icon from your ride deck], during your next ride phase you may ride from your ride deck without discarding.\n[AUTO]: When this unit is placed on (RC), if you have a vanguard with an Aichi icon, [COST: put a non-sentinel normal unit whose only clan is Royal Paladin from your drop on the bottom of your deck], it gets +5000 until end of turn.',
       abilities: [
         { kind: 'AUTO', on: 'placedVC', zones: ['VC'], label: 'Next ride from the ride deck needs no discard', cost: (g, x) => (x.unit && x.unit.rodeFrom === 'hand') ? null : { sb: 1 }, optional: true,
           cond: (g, x) => rideG3(g, x, A) && g.P(x.p).rideDeck.length > 0,
@@ -1346,8 +1349,8 @@ details summary { cursor: pointer; color: var(--ink); }
     a['016'] = T13('016', 'Margal', KS, 'draw', 'High Beast');
     a['017'] = T13('017', 'Yggdrasil Maiden, Elaine', KS, 'heal', 'Elf');
     a['018'] = {
-      set: S13, no: '018', name: 'Protection: Twincast', nation: null, grade: 2, type: 'order', order: 'blitz', regalis: true, power: 0, shield: 0, crit: 0, verified: false,
-      text: 'Regalis Piece (one per deck, used once per fight). Blitz Order: choose one of your units being attacked; it gets +10000 until end of that battle.\n[AUTO](Drop): When your unit is attacked, [COST: remove this card], that unit gets +5000 for each of its grades until end of that battle.',
+      set: S13, no: '018', name: 'Protection: Twincast', nation: null, grade: 2, type: 'order', order: 'blitz', regalis: true, power: 0, shield: 0, crit: 0, verified: true,
+      text: 'Regalis Piece (one per deck, used once per fight). Blitz Order: choose one of your units being attacked; it gets +10000 until end of that battle.\n[CONT]: This card\'s [AUTO] ability can be resolved even if you have resolved a Regalis Piece ability this fight.\n[AUTO](Drop): When your unit is attacked, [COST: remove this card from the drop], choose one of your units being attacked; it gets +5000 for each of its grades until end of that battle.',
       canPlay: (g, x) => !!g.battle && g.battle.tp === x.p && !g.P(x.p).perm.regalisUsed,
       play: function* (g, x) {
         g.P(x.p).perm.regalisUsed = true;
@@ -1438,7 +1441,7 @@ details summary { cursor: pointer; color: var(--ink); }
     k['004'] = U14('004', 'Lizard Soldier, Conroe', DE, 0, { race: 'Reptile', text: '[AUTO]: When this unit is rode upon, if you went second, draw 1.', abilities: [firstVanguardDraw] });
     k['005'] = energyGenerator(S14);
     k['006'] = U14('006', 'Vortex Dragon', DE, 3, {
-      race: 'Flame Dragon', personaFromIcon: K, verified: false,
+      race: 'Flame Dragon', personaFromIcon: K,
       text: '[CONT]: A normal ride of this card from a grade 3 with a Kai icon and a different name also counts as a persona ride.\n[ACT](VC)[1/turn]: [COST: CB1 & Soul Blast 1 grade 3 card with a Kai icon], retire all of your opponent\'s front row rear-guards, and until end of turn this unit gets "[AUTO](VC)[1/turn]: When this unit attacks, choose one of your columns, [Stand] all of your rear-guards in it, and they get +5000 until end of turn (two columns if you persona rode this turn)."\n[CONT](VC/RC): During your turn, if you have a vanguard with a Kai icon, your opponent\'s vanguard is grade 3 or greater, and your vanguard attacked two or more times this turn or one of your opponent\'s rear-guards was retired this turn, this unit gets +10000.\n[CONT](GC): If you have a vanguard with a Kai icon, this card gets shield +10000.',
       abilities: [
         { kind: 'ACT', zones: ['VC'], oncePerTurn: true, label: 'Retire the front row, gain column stand', cost: { cb: 1, sbPick: pg3(K, 'grade 3 with a Kai icon') },
@@ -1451,8 +1454,8 @@ details summary { cursor: pointer; color: var(--ink); }
       ]
     });
     k['007'] = U14('007', 'Great Flame Axe of Ambitious Scales, Colgaflan', DE, 2, {
-      race: 'Flame Dragon', verified: false,
-      text: '[AUTO]: When this card is discarded from your hand during your ride phase, [COST: SB1], put this card on the bottom of your deck and draw 1.\n[AUTO]: When this unit is placed on (RC), if you persona rode this turn, [COST: CB1], retire all of your opponent\'s rear-guards in the same column as this unit.',
+      race: 'Dragoroid', icon: null, clan: null, reprintOf: 'D-BT10/002',
+      text: '[AUTO]: When this card is discarded from your hand during your ride phase, [COST: SB1 & put this card on the bottom of your deck], draw 1.\n[AUTO]: When this unit is placed on (RC), if you persona rode this turn, [COST: CB1], retire all of your opponent\'s rear-guards in the same column as this unit.',
       abilities: [
         { kind: 'AUTO', on: 'discarded', label: 'To the bottom of the deck, draw 1', cost: { sb: 1 }, cond: (g, x) => g.phase === 'ride' && g.active === x.p && g.P(x.p).drop.includes(x.card),
           resolve: function* (g, x) { const pl = g.P(x.p); if (pl.drop.includes(x.card)) { g.take(pl.drop, x.card); pl.deck.push(x.card); } g.draw(x.p, 1); } },
@@ -1462,8 +1465,8 @@ details summary { cursor: pointer; color: var(--ink); }
       ]
     });
     k['008'] = U14('008', 'Berserk Dragon', DE, 2, {
-      race: 'Flame Dragon', verified: false,
-      text: '[AUTO]: When this unit is placed on (VC) or (RC), if you have a vanguard with a Kai icon, [COST: CB1 or SB2 (no cost if you rode this unit from your hand)], choose one: draw 1; or choose one of your opponent\'s rear-guards and retire it.\n[CONT](RC): During your turn, if you have a grade 3 or greater vanguard with a Kai icon, this unit gets +5000 (+10000 instead if your opponent\'s vanguard is grade 3 or greater).',
+      race: 'Flame Dragon',
+      text: '[AUTO]: When this unit is placed on (VC) or (RC), if you have a vanguard with a Kai icon, [COST: CB1 or SB2 (no cost if you rode this unit from your hand)], choose one: draw 1; or choose one of your opponent\'s rear-guards and retire it. If your vanguard is grade 3 or greater, this unit gets +5000 until end of turn.\n[CONT](RC): During your turn, if you have a grade 3 or greater vanguard with a Kai icon, this unit gets +5000 (+10000 instead if your opponent\'s vanguard is grade 3 or greater).',
       abilities: [
         ...['placedVC', 'placedRC'].map(on => ({ kind: 'AUTO', on, zones: [on === 'placedVC' ? 'VC' : 'RC'], optional: true, label: 'Draw 1 or retire a rear-guard',
           cost: (g, x) => (on === 'placedVC' && x.unit && x.unit.rodeFrom === 'hand') ? null : { alt: [{ cb: 1 }, { sb: 2 }] },
@@ -1472,6 +1475,7 @@ details summary { cursor: pointer; color: var(--ink); }
             const items = [{ key: 'draw', label: 'Draw 1' }]; if (oppRGs(g, x).length) items.push({ key: 'retire', label: 'Retire an opponent rear-guard' });
             const m = items.length === 1 ? 'draw' : yield* pickOne(g, x.p, 'Berserk Dragon: choose one', items);
             if (m === 'draw') g.draw(x.p, 1); else yield* retireOpp(g, x);
+            if (g.vgGrade(x.p) >= 3 && g.circOf(x.p, x.unit)) g.addMod(x.unit, { power: 5000, until: 'turn' });
           } })),
         { kind: 'CONT', zones: ['RC'], power: (g, x) => x.targetUnit === x.unit && g.active === x.p && g.vgHasIcon(x.p, K, 3) ? (oppVgG3(g, x) ? 10000 : 5000) : 0 }
       ]
@@ -1534,10 +1538,11 @@ details summary { cursor: pointer; color: var(--ink); }
 
     const B13 = n => S13 + '/' + n, B14 = n => S14 + '/' + n;
     const deck = (name, B, ride, counts, crest) => { const c = {}; for (const kk in counts) c[B(kk)] = counts[kk]; return { name, ride: ride.map(B), counts: c, crest: B(crest) }; };
+    // official start deck lists: 50-card main deck + ride deck (4) + Energy Generator
     DECKS.aichi = deck('Aichi: Blaster Blade (Keter Sanctuary)', B13, ['004', '003', '002', '001'],
-      { '001': 2, '006': 3, '002': 3, '007': 4, '008': 3, '009': 4, '010': 2, '011': 4, '012': 4, '018': 1, '014': 4, '015': 4, '016': 4, '017': 3, '013': 1 }, '005');
+      { '001': 3, '002': 3, '003': 2, '006': 4, '007': 4, '008': 4, '009': 1, '010': 4, '011': 4, '012': 4, '013': 1, '014': 4, '015': 4, '016': 3, '017': 4, '018': 1 }, '005');
     DECKS.kai = deck('Kai: Dragonic Overlord (Dragon Empire)', B14, ['004', '003', '002', '001'],
-      { '001': 3, '006': 3, '002': 2, '008': 4, '009': 4, '007': 1, '018': 1, '010': 4, '011': 4, '012': 4, '014': 4, '015': 4, '016': 3, '017': 4, '013': 1 }, '005');
+      { '001': 3, '002': 3, '003': 2, '006': 4, '007': 1, '008': 4, '009': 4, '010': 4, '011': 4, '012': 4, '013': 1, '014': 4, '015': 4, '016': 3, '017': 4, '018': 1 }, '005');
   }
   if (typeof module !== 'undefined' && module.exports) module.exports = install; else root.VGCardsDZSS = install;
 })(this);
@@ -1796,12 +1801,12 @@ details summary { cursor: pointer; color: var(--ink); }
     nirvana: {
       name: 'Nirvana (Dragon Empire)',
       ride: ['D-SD01/004', 'D-SD01/003', 'D-SD01/002', 'D-SD01/001'],
-      counts: { 'D-SD01/001': 3, 'D-SD01/006': 4, 'D-BT01/011': 4, 'D-SD01/005': 4, 'D-SD01/007': 4, 'D-SD01/008': 4, 'D-SD01/009': 4, 'D-SD01/015': 3, 'D-SD01/011': 4, 'D-SD01/013': 4, 'D-SD01/014': 4, 'D-SD01/012': 3, 'D-SD01/010': 1 }
+      counts: { 'D-SD01/001': 3, 'D-SD01/006': 4, 'D-BT01/011': 4, 'D-SD01/005': 4, 'D-SD01/007': 4, 'D-SD01/008': 4, 'D-SD01/009': 4, 'D-SD01/015': 4, 'D-BT01/001': 3, 'D-SD01/011': 4, 'D-SD01/013': 4, 'D-SD01/014': 4, 'D-SD01/012': 3, 'D-SD01/010': 1 }
     },
     bastion: {
       name: 'Bastion (Keter Sanctuary)',
       ride: ['D-SD03/004', 'D-SD03/003', 'D-SD03/002', 'D-SD03/001'],
-      counts: { 'D-SD03/001': 3, 'D-BT01/007': 4, 'D-BT01/020': 4, 'D-SD03/002': 3, 'D-SD03/003': 3, 'D-SD03/009': 4, 'D-TD03/002': 4, 'DZ-TD04/009': 4, 'D-SS06/007': 1, 'D-SD03/011': 4, 'D-SD03/013': 4, 'D-SD03/014': 4, 'D-BT01/103': 3, 'D-SD01/010': 1 }
+      counts: { 'D-SD03/001': 3, 'D-BT01/007': 4, 'D-BT01/020': 4, 'D-BT01/097': 2, 'D-BT01/100': 2, 'D-SD03/002': 3, 'D-SD03/003': 3, 'D-SD03/009': 4, 'D-TD03/002': 4, 'DZ-TD04/009': 4, 'D-SS06/007': 1, 'D-SD03/011': 4, 'D-SD03/013': 4, 'D-SD03/014': 4, 'D-BT01/103': 3, 'D-SD01/010': 1 }
     }
   };
   const helpers = { vanilla, trig, firstVanguardDraw, sentinel, SENTINEL_TEXT, battleAttacked };
@@ -2849,8 +2854,10 @@ details summary { cursor: pointer; color: var(--ink); }
     const errs = []; const all = deck.ride.concat(deck.main);
     if (deck.ride.length !== 4) errs.push('The ride deck needs 4 cards (grades 0, 1, 2 and 3).');
     else { const gs = deck.ride.map(id => db[id] && db[id].grade).sort().join(','); if (gs !== '0,1,2,3') errs.push('The ride deck needs exactly one grade 0, 1, 2 and 3.'); }
-    if (all.length !== 50) errs.push('The deck has ' + all.length + ' cards; it needs exactly 50 (ride deck included).');
+    // current Standard rules: 50-card main deck + separate ride deck (4 units + crest); 16 triggers across both
+    if (deck.main.length !== 50) errs.push('The main deck has ' + deck.main.length + ' cards; it needs exactly 50 (the ride deck is separate).');
     const trig = all.filter(id => db[id].trigger).length; if (trig !== 16) errs.push(trig + ' triggers; it needs exactly 16.');
+    for (const t of ['crit', 'draw', 'front']) { const n = all.filter(id => db[id].trigger === t).length; if (n > 8) errs.push('Max 8 ' + t + ' triggers (has ' + n + ').'); }
     const heal = all.filter(id => db[id].trigger === 'heal').length; if (heal > 4) errs.push('Max 4 heal triggers (has ' + heal + ').');
     const over = all.filter(id => db[id].trigger === 'over').length; if (over > 1) errs.push('Max 1 over trigger (has ' + over + ').');
     const sent = all.filter(id => db[id].sentinel).length; if (sent > 4) errs.push('Max 4 sentinels (has ' + sent + ').');
@@ -3817,7 +3824,8 @@ details summary { cursor: pointer; color: var(--ink); }
     const total = ids.reduce((s, id) => s + edit.total[id], 0);
     const trig = ids.reduce((s, id) => s + (CARDS[id].trigger ? edit.total[id] : 0), 0);
     const byG = [0, 1, 2, 3].map(g => ids.reduce((s, id) => s + (CARDS[id].grade === g ? edit.total[id] : 0), 0));
-    $('#b-sum').innerHTML = '<span class="chip">' + total + '/50 cards</span><span class="chip">' + trig + '/16 triggers</span>' + byG.map((n, g) => '<span class="chip">G' + g + ': ' + n + '</span>').join('');
+    const mainN = total - edit.ride.length;
+    $('#b-sum').innerHTML = '<span class="chip">Main deck ' + mainN + '/50</span><span class="chip">Ride deck ' + edit.ride.length + '/4 + Energy Generator</span><span class="chip">' + trig + '/16 triggers</span>' + byG.map((n, g) => '<span class="chip">G' + g + ': ' + n + '</span>').join('');
     const rideSorted = edit.ride.slice().sort((a, b) => CARDS[a].grade - CARDS[b].grade);
     $('#b-ride').innerHTML = [0, 1, 2, 3].map(g => { const id = rideSorted.find(x => CARDS[x].grade === g); return '<div style="width:64px;font-size:8px">' + (id ? cardHTML(id) : '<div class="circ" style="max-height:none">G' + g + '</div>') + '</div>'; }).join('');
     $('#b-list').innerHTML = ids.map(id => '<div class="ln"><b>' + edit.total[id] + '×</b><span class="chip">G' + CARDS[id].grade + '</span><span>' + esc(CARDS[id].name) + '</span><span class="muted">' + (CARDS[id].trigger ? TRIG_PT[CARDS[id].trigger] : '') + '</span></div>').join('') || '<p class="muted">Empty deck. Add cards with the "+" buttons.</p>';
