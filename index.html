@@ -1,0 +1,2118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>duels.vanguard</title>
+<meta name="description" content="Free, unofficial automated Cardfight!! Vanguard simulator (Standard format).">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Chakra+Petch:wght@500;600;700&display=swap">
+<style>/* Layout: one-screen tabletop for play (fixed overlay), scrolling pages for menu/decks/cards/ranking.
+   Single dark "table felt" look by choice. */
+:root {
+  --felt: #121831;
+  --felt-2: #1a2246;
+  --panel: #20294f;
+  --line: #34407a;
+  --ink: #eef0fa;
+  --ink-dim: #a3abd3;
+  --gold: #e5bd5c;
+  --gold-ink: #2a1d00;
+  --crimson: #e2563f;
+  --azure: #5ab0ff;
+  --leaf: #4fcf8d;
+  --violet: #b98cff;
+  --de-a: #b2311f; --de-b: #f08a3c;
+  --ks-a: #3c62b8; --ks-b: #e8d18a;
+  --nn-a: #5b3aa6; --nn-b: #d8a6ff;
+  --f-display: "Chakra Petch", "Trebuchet MS", system-ui, sans-serif;
+  --f-body: "Barlow", "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { background: var(--felt); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.45; -webkit-tap-highlight-color: transparent; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; letter-spacing: .01em; }
+.wrap { max-width: 980px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 12px 40px; }
+
+/* top nav */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--felt); border-bottom: 1px solid var(--line); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--felt); }
+.top .wrap { display: flex; align-items: center; gap: 12px; padding-block: 10px; flex-wrap: wrap; }
+.logo { font-family: var(--f-display); font-weight: 700; font-size: 20px; letter-spacing: .02em; }
+.logo b { color: var(--gold); }
+.nav { display: flex; gap: 6px; margin-left: auto; flex-wrap: wrap; }
+.nav button { background: none; border: 1px solid transparent; border-radius: 8px; padding: 6px 10px; color: var(--ink-dim); }
+.nav button[aria-current="page"] { color: var(--ink); border-color: var(--line); background: var(--felt-2); }
+
+.btn { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; font-weight: 600; }
+.btn.primary { background: var(--gold); color: var(--gold-ink); border-color: var(--gold); }
+.btn.danger { background: transparent; border-color: var(--crimson); color: var(--crimson); }
+.btn.small { padding: 6px 10px; font-size: 13px; border-radius: 8px; }
+.btn:disabled { opacity: .45; cursor: default; }
+.chip { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 2px 8px; border-radius: 99px; background: var(--felt-2); border: 1px solid var(--line); color: var(--ink-dim); }
+.muted { color: var(--ink-dim); }
+.label { font-family: var(--f-display); text-transform: uppercase; letter-spacing: .08em; font-size: 11px; color: var(--ink-dim); }
+
+/* home */
+.hero { display: grid; gap: 18px; grid-template-columns: 1.2fr 1fr; align-items: center; padding-block: 18px 6px; }
+.hero h1 { font-size: clamp(30px, 6vw, 52px); line-height: 1.02; }
+.hero h1 em { font-style: normal; color: var(--gold); }
+.hero p { max-width: 58ch; color: var(--ink-dim); margin: 10px 0 0; }
+.fan { position: relative; height: 210px; }
+.fan .card { position: absolute; width: 120px; left: 50%; top: 10px; }
+.panel { background: var(--felt-2); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+.play-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin-top: 16px; }
+.field-row { display: grid; gap: 6px; }
+.field-row select, .field-row input { width: 100%; background: var(--felt); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; font: inherit; }
+.stack { display: grid; gap: 12px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.note { font-size: 13px; color: var(--ink-dim); border-left: 3px solid var(--gold); padding: 4px 0 4px 10px; }
+
+/* card frame */
+.card { --a: var(--nn-a); --b: var(--nn-b); position: relative; width: 100%; aspect-ratio: 63 / 88; max-width: 100%; border-radius: 7%/5%; overflow: hidden;
+  background: linear-gradient(160deg, var(--b) -20%, var(--a) 55%, #0b0f22 120%); border: 1px solid rgba(255,255,255,.25); box-shadow: 0 2px 8px rgba(0,0,0,.45); color: #fff; user-select: none; }
+.card.n-DE { --a: var(--de-a); --b: var(--de-b); }
+.card.n-KS { --a: var(--ks-a); --b: var(--ks-b); }
+.card .art { position: absolute; inset: 15% 8% 30%; border-radius: 4px; background:
+  radial-gradient(circle at 50% 40%, rgba(255,255,255,.35), transparent 55%), repeating-linear-gradient(135deg, rgba(255,255,255,.07) 0 6px, transparent 6px 12px); display: grid; place-items: center; overflow: hidden; }
+.card .art img { width: 100%; height: 100%; object-fit: cover; }
+.card .art .glyph { font-family: var(--f-display); font-weight: 700; font-size: 2.1em; opacity: .55; }
+.card .gr { position: absolute; top: 3%; left: 4%; width: 1.9em; height: 1.9em; border-radius: 50%; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.5); display: grid; place-items: center; font-family: var(--f-display); font-weight: 700; font-size: .85em; }
+.card .tg { position: absolute; top: 3%; right: 4%; padding: .1em .4em; border-radius: 4px; font-size: .62em; font-weight: 700; font-family: var(--f-display); text-transform: uppercase; letter-spacing: .04em; color: #111; }
+.tg.crit { background: #ffd447; } .tg.draw { background: #7cc6ff; } .tg.front { background: #ff7a6b; } .tg.heal { background: #6be3a0; } .tg.over { background: linear-gradient(90deg,#ff8a8a,#ffe08a,#8affc1,#8ac8ff,#d18aff); }
+.tg.sent { background: #ffffff; } .tg.ord { background: #d8c3ff; }
+.card .nm { position: absolute; left: 0; right: 0; bottom: 0; padding: 3% 5% 4%; background: linear-gradient(transparent, rgba(0,0,0,.85) 35%); font-size: .58em; line-height: 1.15; font-weight: 600; }
+.card .pw { display: flex; justify-content: space-between; font-family: var(--f-display); font-size: 1.3em; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.card .sh { position: absolute; left: 4%; top: 42%; writing-mode: vertical-rl; transform: rotate(180deg); font-family: var(--f-display); font-size: .6em; opacity: .9; background: rgba(0,0,0,.45); padding: 3px 1px; border-radius: 3px; }
+.card.back { background: repeating-linear-gradient(45deg, #2a2f6a 0 8px, #222760 8px 16px); }
+.card.back::after { content: "VG"; position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--f-display); font-weight: 700; color: rgba(229,189,92,.6); font-size: 1.4em; }
+
+/* game overlay */
+.game { position: fixed; inset: 0; z-index: 20; background: radial-gradient(120% 60% at 50% 50%, var(--felt-2), var(--felt)); display: grid; grid-template-rows: auto 1fr auto auto auto;
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+.gbar { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.gbar .phase { font-family: var(--f-display); font-weight: 700; color: var(--gold); }
+.gbar .spacer { flex: 1; }
+.tablewrap { display: grid; grid-template-columns: 1fr auto; min-height: 0; }
+.table { min-height: 0; overflow: auto; display: grid; align-content: center; gap: 6px; padding: 6px 8px; }
+.side { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; max-width: 560px; width: 100%; margin: 0 auto; }
+.fieldgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; max-width: 360px; width: 100%; margin: 0 auto; }
+.circ { position: relative; aspect-ratio: 63 / 88; border-radius: 8px; border: 1px dashed rgba(163,171,211,.35); display: grid; place-items: center; font-size: 10px; color: rgba(163,171,211,.6); max-height: 19vh; justify-self: center; width: 100%; font-family: var(--f-display); }
+.circ.vc { border-color: rgba(229,189,92,.55); }
+.circ .card { position: absolute; inset: 0; width: 100%; height: 100%; transition: transform .25s ease; font-size: clamp(8px, 2.4vw, 13px); }
+.circ.rested .card { transform: rotate(90deg) scale(.7); }
+.circ.sel { outline: 2px solid var(--gold); outline-offset: 2px; }
+.circ.target { outline: 2px dashed var(--crimson); outline-offset: 2px; animation: pulse 1s infinite; }
+.circ.can { outline: 2px dashed var(--gold); outline-offset: 2px; }
+.circ.attacking .card { box-shadow: 0 0 0 2px var(--crimson), 0 0 18px var(--crimson); }
+.circ.defending .card { box-shadow: 0 0 0 2px var(--azure), 0 0 18px var(--azure); }
+@keyframes pulse { 50% { outline-color: transparent; } }
+@media (prefers-reduced-motion: reduce) { .circ.target { animation: none; } .circ .card { transition: none; } }
+.badge { position: absolute; z-index: 2; font-family: var(--f-display); font-weight: 700; font-size: 11px; padding: 1px 5px; border-radius: 5px; font-variant-numeric: tabular-nums; }
+.badge.pw { bottom: -6px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #111; white-space: nowrap; }
+.badge.pw.up { background: var(--gold); }
+.badge.cr { top: -6px; right: -4px; background: var(--crimson); color: #fff; }
+.badge.od { top: -6px; left: -4px; background: var(--violet); color: #111; }
+.zones { display: grid; gap: 4px; font-size: 11px; min-width: 64px; }
+.zone { display: flex; justify-content: space-between; gap: 6px; background: rgba(0,0,0,.25); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; font-variant-numeric: tabular-nums; }
+button.zone { text-align: left; }
+.dmg { display: flex; gap: 3px; justify-content: center; }
+.dmg i { width: 13px; height: 18px; border-radius: 2px; border: 1px solid rgba(255,255,255,.25); display: block; }
+.dmg i.up { background: var(--crimson); } .dmg i.down { background: #5a2a2a; } .dmg i.empty { background: transparent; }
+.mid { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 30px; font-family: var(--f-display); font-size: 14px; flex-wrap: wrap; }
+.vs { font-variant-numeric: tabular-nums; padding: 3px 10px; border-radius: 8px; background: rgba(0,0,0,.35); border: 1px solid var(--line); }
+.vs .a { color: var(--crimson); font-weight: 700; } .vs .d { color: var(--azure); font-weight: 700; }
+.gc { display: flex; gap: 4px; }
+.gc .card { width: 34px; font-size: 6px; }
+.handbar { display: flex; gap: 6px; overflow-x: auto; padding: 6px 10px 8px; scroll-snap-type: x proximity; min-height: 112px; align-items: end; }
+.handbar .hc { flex: 0 0 auto; width: 70px; scroll-snap-align: start; border: 0; background: none; padding: 0; transition: transform .15s; font-size: 10px; }
+.handbar .hc.sel { transform: translateY(-8px); }
+.handbar .hc.sel .card { outline: 2px solid var(--gold); outline-offset: 1px; }
+.handbar .hc.dim { opacity: .5; }
+.actionbar { display: flex; gap: 8px; align-items: center; padding: 6px 10px; border-top: 1px solid var(--line); background: rgba(0,0,0,.25); flex-wrap: wrap; min-height: 50px; }
+.actionbar .hint { flex: 1 1 160px; font-size: 13px; color: var(--ink-dim); min-width: 0; }
+.detail { display: grid; grid-template-columns: 64px 1fr; gap: 10px; padding: 8px 10px; border-top: 1px solid var(--line); background: var(--panel); font-size: 13px; }
+.detail .card { font-size: 9px; }
+.detail .txt { white-space: pre-line; max-height: 22vh; overflow: auto; min-width: 0; }
+.detail .acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.logp { width: 260px; border-left: 1px solid var(--line); overflow: auto; font-size: 12px; padding: 8px; display: none; }
+.logp p { margin: 0 0 4px; } .logp p.p0 { color: var(--ink); } .logp p.p1 { color: #ffb3a6; } .logp p.sys { color: var(--gold); }
+@media (min-width: 900px) { .logp { display: block; } .tablewrap .logbtn { display: none; } }
+
+/* sheet */
+.sheet { position: fixed; inset: 0; z-index: 40; background: rgba(5,8,20,.6); display: grid; align-items: end; justify-items: center; }
+.sheet .box { width: min(640px, 100%); max-height: 82vh; overflow: auto; background: var(--felt-2); border: 1px solid var(--line); border-radius: 16px 16px 0 0;
+  padding: 14px max(16px, env(safe-area-inset-right, 0px)) calc(14px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); display: grid; gap: 12px; }
+.sheet h3 { font-size: 17px; }
+.pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 8px; }
+.pick button { background: none; border: 2px solid transparent; border-radius: 10px; padding: 2px; font-size: 10px; display: grid; gap: 3px; text-align: center; color: var(--ink-dim); }
+.pick button[aria-pressed="true"] { border-color: var(--gold); color: var(--ink); }
+.optlist { display: grid; gap: 8px; }
+.optlist button { text-align: left; }
+
+/* deck builder */
+.builder { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; margin-top: 12px; }
+@media (max-width: 760px) { .builder { grid-template-columns: 1fr; } .hero { grid-template-columns: 1fr; } .fan { display: none; } }
+.pool { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+.pool .it { display: grid; gap: 4px; font-size: 11px; }
+.pool .it .card { font-size: 10px; cursor: pointer; }
+.qty { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+.qty button { width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); }
+.qty b { font-family: var(--f-display); font-variant-numeric: tabular-nums; }
+.decklist { display: grid; gap: 4px; font-size: 13px; }
+.decklist .ln { display: grid; grid-template-columns: 22px 26px minmax(0, 1fr) auto; gap: 6px; align-items: center; padding: 4px 6px; border-radius: 6px; background: rgba(0,0,0,.2); }
+.decklist .ln span:nth-child(3) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.errs { display: grid; gap: 4px; font-size: 13px; color: #ffb3a6; }
+.ok { color: var(--leaf); font-weight: 600; }
+table.rank { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.rank td, table.rank th { padding: 8px 6px; border-bottom: 1px solid var(--line); text-align: left; font-variant-numeric: tabular-nums; }
+.result { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: rgba(5,8,20,.72); padding: 16px; }
+.result .box { background: var(--felt-2); border: 1px solid var(--line); border-radius: 16px; padding: 24px; text-align: center; display: grid; gap: 12px; max-width: 360px; width: 100%; }
+.result h2 { font-size: 34px; }
+.result h2.win { color: var(--gold); } .result h2.lose { color: var(--crimson); }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(130px + env(safe-area-inset-bottom, 0px)); z-index: 45; background: var(--ink); color: #111; padding: 8px 14px; border-radius: 10px; font-weight: 600; font-size: 14px; max-width: 90vw; text-align: center; pointer-events: none; }
+#opp-hand .card.back::after { font-size: 7px; }
+@media (max-width: 760px) { .builder aside { order: -1; position: static !important; } .builder .decklist { max-height: 30vh !important; } }
+
+.dropzone { border: 1px dashed transparent; border-radius: 10px; padding: 6px; margin: -6px; }
+.dropzone.over { border-color: var(--gold); background: rgba(229,189,92,.08); }
+code { font-size: 12px; background: rgba(0,0,0,.3); padding: 0 4px; border-radius: 4px; }
+details summary { cursor: pointer; color: var(--ink); }
+.card img.scan { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; opacity: 0; transition: opacity .2s; }
+.card img.scan.ok { opacity: 1; }
+.legal { font-size: 12px; color: var(--ink-dim); border-top: 1px solid var(--line); margin-top: 24px; padding-block: 14px 28px; display: grid; gap: 6px; }
+.legal p { margin: 0; max-width: 90ch; }
+.legal a { color: var(--gold); }
+.gamelegal { margin: 2px 0 0; text-align: center; font-size: 10px; color: var(--ink-dim); opacity: .8; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <span class="logo">duels.<b>vanguard</b></span>
+    <nav class="nav" aria-label="Sections">
+      <button data-v="play">Play</button>
+      <button data-v="decks">Decks</button>
+      <button data-v="cards">Cards</button>
+      <button data-v="ranking">Ranking</button>
+    </nav>
+  </div>
+</header>
+
+<main id="view-home" class="wrap">
+  <section class="hero">
+    <div>
+      <span class="label">Automated simulator · Standard format (D / DZ)</span>
+      <h1>Stand up, <em>vanguard</em>.<br>Effects resolve themselves.</h1>
+      <p>Ride deck, Persona Ride, overDress, triggers, sentinels and card abilities programmed one by one. You make the decisions; the engine handles the rules.</p>
+    </div>
+    <div class="fan" id="fan" aria-hidden="true"></div>
+  </section>
+
+  <div class="play-grid">
+    <section class="panel stack">
+      <h2>Quick match vs bot</h2>
+      <div class="field-row"><label class="label" for="my-deck">Your deck</label><select id="my-deck"></select></div>
+      <div class="field-row"><label class="label" for="bot-deck">Bot deck</label><select id="bot-deck"></select></div>
+      <div class="field-row"><label class="label" for="bot-speed">Bot speed</label>
+        <select id="bot-speed"><option value="slow">Slow (good for learning)</option><option value="normal">Normal</option><option value="fast">Fast</option></select></div>
+      <button class="btn primary" id="play-bot">Play now</button>
+      <p class="muted" style="margin:0;font-size:13px">Your local rating: <b id="home-rating"></b></p>
+    </section>
+
+    <section class="panel stack">
+      <h2>Online and global ranking</h2>
+      <p class="muted" style="margin:0">Quick queue, player-vs-player matches and a shared ranking come next, with a match server. The engine is ready for it: every decision is a small message, so the same code runs on the server.</p>
+      <button class="btn" disabled>Find a match (coming soon)</button>
+      <div class="note">For now the ranking is local to this browser.</div>
+    </section>
+
+    <section class="panel stack">
+      <h2>Settings</h2>
+      <label class="row" for="auto-boost"><input type="checkbox" id="auto-boost"> Boost automatically</label>
+      <div class="field-row">
+        <label class="label" for="img-tpl">Card image source</label>
+        <input id="img-tpl" type="text" inputmode="url" placeholder="https://example.com/cards/{setl}/{setl}_{no}.png" autocomplete="off">
+        <div class="row"><button class="btn small" id="img-official">Use official card list images</button></div>
+        <span class="muted" style="font-size:12px">Placeholders: {set} (D-SD01), {setl} (dsd01), {no} (001), {id}. Leave empty for generated frames. External images load when this page is hosted on your own site; the claude.ai preview blocks them, so use an image pack there.</span>
+      </div>
+      <div class="field-row dropzone" id="img-drop">
+        <span class="label">Image pack</span>
+        <div class="row">
+          <label class="btn small" for="img-files">Choose images or .zip</label>
+          <input type="file" id="img-files" multiple accept="image/*,.zip" hidden>
+          <label class="btn small" for="img-dir">Choose folder</label>
+          <input type="file" id="img-dir" webkitdirectory multiple hidden>
+          <button class="btn small danger" id="img-clear">Remove</button>
+        </div>
+        <span class="muted" style="font-size:12px">Drop files here or choose them above. Cards are matched by file name: <code>dbt01_001.png</code>, <code>D-SD01-004EN.jpg</code>, <code>DZ-TD04_009.webp</code> or the card name (<code>Vairina Arcs.png</code>). Images are stored in this browser and take priority over the image source.</span>
+        <span class="muted" id="img-status" style="font-size:13px"></span>
+      </div>
+    </section>
+  </div>
+</main>
+
+<main id="view-decks" class="wrap" hidden>
+  <h2 style="margin-top:8px">Deck builder</h2>
+  <div class="builder">
+    <section class="stack">
+      <div class="row" id="b-filter" role="group" aria-label="Filter by nation">
+        <button class="btn small" data-f="all">All</button><button class="btn small" data-f="DE">Dragon Empire</button><button class="btn small" data-f="KS">Keter Sanctuary</button><button class="btn small" data-f="NN">Nationless</button>
+      </div>
+      <div class="field-row"><label class="label" for="b-q">Search cards</label><input id="b-q" type="search" placeholder="Card name"></div>
+      <div class="pool" id="b-pool"></div>
+    </section>
+    <aside class="panel stack" style="align-self:start;position:sticky;top:calc(64px + env(safe-area-inset-top, 0px))">
+      <div class="field-row"><label class="label" for="b-name">Deck name</label><input id="b-name" type="text"></div>
+      <div class="row" id="b-sum"></div>
+      <div><span class="label">Ride deck</span><div class="row" id="b-ride" style="margin-top:6px"></div></div>
+      <div class="errs" id="b-errs"></div>
+      <div class="decklist" id="b-list" style="max-height:40vh;overflow:auto"></div>
+      <div class="row">
+        <button class="btn primary" id="b-save">Save</button>
+        <button class="btn" id="b-new">New</button>
+        <select id="b-load" class="btn" aria-label="Load deck"></select>
+        <button class="btn danger small" id="b-del">Delete</button>
+      </div>
+    </aside>
+  </div>
+</main>
+
+<main id="view-cards" class="wrap" hidden>
+  <h2 style="margin-top:8px">Card pool</h2>
+  <p class="muted">Every card here has its ability programmed in the engine. "Summarized text" means the ability came from the official overDress guide and still needs checking against the printed card.</p>
+  <div class="row" id="cards-filter" role="group" aria-label="Filter by nation">
+    <button class="btn small" data-f="all">All</button><button class="btn small" data-f="DE">Dragon Empire</button><button class="btn small" data-f="KS">Keter Sanctuary</button><button class="btn small" data-f="NN">Nationless</button>
+  </div>
+  <div class="field-row" style="margin-top:10px;max-width:360px"><label class="label" for="cards-q">Search</label><input id="cards-q" type="search" placeholder="Card name"></div>
+  <div class="stack" id="cards-grid" style="margin-top:14px"></div>
+</main>
+
+<main id="view-rank" class="wrap" hidden>
+  <h2 style="margin-top:8px">Ranking</h2>
+  <p class="muted">Local Elo rating against the bot (base 1000, K=32). The global player ranking arrives with online play.</p>
+  <div id="rank-sum" class="panel"></div>
+  <h3 style="margin-top:16px">Recent matches</h3>
+  <div id="rank-hist" style="margin-top:8px"></div>
+</main>
+
+<footer class="wrap legal" id="legal">
+  <p>duels.vanguard is a free, unofficial fan-made simulator. It is not affiliated with, endorsed, sponsored or approved by Bushiroad. Cardfight!! Vanguard, card names, card text and card images are © Bushiroad. All rights reserved.</p>
+  <p>Card images are used following the guidelines published on the <a href="https://en.cf-vanguard.com/vg_guideline/" target="_blank" rel="noopener">Cardfight!! Vanguard official website</a>. Reuse of the images (reproduction, distribution, etc.) is prohibited. No fees, ads or paid features.</p>
+</footer>
+
+<section class="game" id="game" hidden aria-label="Game table">
+  <div class="gbar">
+    <button class="btn small" id="g-quit">Quit</button>
+    <span class="phase" id="g-phase"></span>
+    <span class="chip" id="g-who"></span>
+    <span class="spacer"></span>
+    <button class="btn small logbtn" id="g-log">Log</button>
+  </div>
+  <div class="tablewrap">
+    <div class="table">
+      <div class="row" id="opp-hand" style="justify-content:center;gap:3px;min-height:20px" aria-label="Bot hand"></div>
+      <div class="side" id="opp-side"></div>
+      <div class="mid" id="mid"></div>
+      <div class="side" id="me-side"></div>
+      <p class="gamelegal">Card images and text © Bushiroad · unofficial fan simulator</p>
+    </div>
+    <div class="logp" id="logp" aria-label="Log"></div>
+  </div>
+  <div class="detail" id="detail" hidden></div>
+  <div class="actionbar" id="actionbar"></div>
+  <div class="handbar" id="hand" aria-label="Your hand"></div>
+</section>
+
+<div class="sheet" id="sheet" hidden></div>
+<div class="result" id="result" hidden></div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>/* Card database. Stats and abilities follow the printed English cards; rules text below is a short summary written for the simulator.
+   verified:false marks cards whose wording came from the official overDress guide summary rather than the printed text. */
+(function (root) {
+  'use strict';
+  const DE = 'Dragon Empire', KS = 'Keter Sanctuary';
+  const battleAttacked = (g, x) => x.targetUnit === x.unit && g.battle && g.battle.aUnit === x.unit;
+
+  const vanilla = (o) => Object.assign({ type: 'unit', crit: 1, abilities: [], verified: true }, o);
+  const trig = (o) => vanilla(Object.assign({ grade: 0, power: 5000, skill: 'boost' }, o));
+
+  const firstVanguardDraw = {
+    kind: 'AUTO', on: 'rodeUpon', label: 'If you went second, draw 1', cond: (g, x) => g.P(x.p).wentSecond,
+    resolve: function* (g, x) { g.draw(x.p, 1); }
+  };
+  const sentinel = {
+    kind: 'AUTO', on: 'putOnGC', zones: ['GC'], label: 'Choose one of your units; it cannot be hit this battle', cost: { discard: 1 },
+    resolve: function* (g, x) {
+      const circ = yield* g.chooseUnit(x.p, { title: 'Sentinel: which unit cannot be hit?', purpose: 'sentinel', alwaysAsk: true });
+      if (circ) { g.unitAt(x.p, circ).noHit = true; g.log(g.name(g.unitAt(x.p, circ).c) + ' cannot be hit this battle.', x.p); }
+    }
+  };
+  const SENTINEL_TEXT = '[CONT]: Sentinel (max 4 per deck).\n[AUTO]: When placed on (GC), [COST: discard 1], choose one of your units; it cannot be hit until end of that battle.';
+
+  const CARDS = {
+    /* ================= D-SD01: Yu-yu Kondo -Holy Dragon- (Dragon Empire) ================= */
+    'D-SD01/001': vanilla({
+      set: 'D-SD01', no: '001', name: 'Chakrabarthi Divine Dragon, Nirvana', nation: DE, grade: 3, power: 13000, shield: 0, skill: 'twin', persona: true, race: 'Flame Dragon',
+      text: '[ACT](VC)[1/turn]: [COST: discard 1], choose a grade 0 from your drop and call it to (RC).\n[AUTO](VC): When this unit attacks, [COST: CB1], this unit and all your units with overDress get +10000 until end of turn.',
+      abilities: [
+        {
+          kind: 'ACT', zones: ['VC'], oncePerTurn: true, label: 'Call a grade 0 from drop', cost: { discard: 1 },
+          cond: (g, x) => g.P(x.p).drop.some(c => g.def(c).grade === 0) || g.P(x.p).hand.some(c => g.def(c).grade === 0),
+          resolve: function* (g, x) {
+            const cs = yield* g.chooseFromZone(x.p, 'drop', { title: 'Choose a grade 0 from your drop to call', filter: c => g.def(c).grade === 0, min: 1, max: 1, purpose: 'callFromDrop' });
+            if (!cs.length) return;
+            const circ = yield* g.chooseCircle(x.p, { title: 'Call ' + g.name(cs[0]) + ' to which circle?', card: cs[0] });
+            g.take(g.P(x.p).drop, cs[0]);
+            yield* g.callTo(x.p, cs[0], circ, 'drop');
+          }
+        },
+        {
+          kind: 'AUTO', on: 'attack', zones: ['VC'], label: 'This unit and overDress units +10000', cost: { cb: 1 },
+          resolve: function* (g, x) {
+            g.addMod(x.unit, { power: 10000, until: 'turn' });
+            for (const s of g.units(x.p)) if (s.u !== x.unit && g.def(s.u.c).overDress) g.addMod(s.u, { power: 10000, until: 'turn' });
+          }
+        }
+      ]
+    }),
+    'D-SD01/002': vanilla({
+      set: 'D-SD01', no: '002', name: 'Blaze Maiden, Reiyu', nation: DE, grade: 2, power: 10000, shield: 5000, skill: 'intercept', race: 'Human', verified: false,
+      text: '[AUTO]: When this unit is rode upon by "Chakrabarthi Divine Dragon, Nirvana", [COST: SB1], search your deck for up to one "Vairina" and put it into your hand.',
+      abilities: [{
+        kind: 'AUTO', on: 'rodeUpon', label: 'Search for "Vairina"', cost: { sb: 1 },
+        cond: (g, x) => g.def(x.newCard).name === 'Chakrabarthi Divine Dragon, Nirvana',
+        resolve: function* (g, x) {
+          const cs = yield* g.searchDeck(x.p, { title: 'Search for up to one "Vairina"', filter: c => g.def(c).name === 'Vairina', max: 1 });
+          for (const c of cs) { g.take(g.P(x.p).trig, c); g.P(x.p).hand.push(c); g.log(g.name(c) + ' is added to hand.', x.p); }
+        }
+      }]
+    }),
+    'D-SD01/003': vanilla({
+      set: 'D-SD01', no: '003', name: 'Blaze Maiden, Rino', nation: DE, grade: 1, power: 8000, shield: 5000, skill: 'boost', race: 'Human',
+      text: '[AUTO]: When this unit is rode upon by "Blaze Maiden, Reiyu", search your deck for up to one "Trickstar" and call it to (RC).\n[CONT](VC/RC): During the battle this unit attacked, it gets +2000.',
+      abilities: [
+        {
+          kind: 'AUTO', on: 'rodeUpon', label: 'Call "Trickstar" from deck', cond: (g, x) => g.def(x.newCard).name === 'Blaze Maiden, Reiyu',
+          resolve: function* (g, x) {
+            const cs = yield* g.searchDeck(x.p, { title: 'Search for up to one "Trickstar" to call', filter: c => g.def(c).name === 'Trickstar', max: 1 });
+            if (!cs.length) return;
+            const circ = yield* g.chooseCircle(x.p, { title: 'Call Trickstar to which circle?', card: cs[0] });
+            g.take(g.P(x.p).trig, cs[0]);
+            yield* g.callTo(x.p, cs[0], circ, 'deck');
+          }
+        },
+        { kind: 'CONT', zones: ['VC', 'RC'], power: (g, x) => battleAttacked(g, x) ? 2000 : 0 }
+      ]
+    }),
+    'D-SD01/004': vanilla({
+      set: 'D-SD01', no: '004', name: 'Sunrise Egg', nation: DE, grade: 0, power: 6000, shield: 5000, skill: 'boost', race: 'Flame Dragon',
+      text: '[AUTO]: When this unit is rode upon, if you went second, draw 1.', abilities: [firstVanguardDraw]
+    }),
+    'D-SD01/005': vanilla({
+      set: 'D-SD01', no: '005', name: 'Fire Slash Dragon, Inferno Sword', nation: DE, grade: 3, power: 13000, shield: 0, skill: 'twin', persona: true, race: 'Flame Dragon',
+      text: '[CONT](RC): During the battle this unit attacked, it gets +2000.',
+      abilities: [{ kind: 'CONT', zones: ['RC'], power: (g, x) => battleAttacked(g, x) ? 2000 : 0 }]
+    }),
+    'D-SD01/006': vanilla({
+      set: 'D-SD01', no: '006', name: 'Vairina', nation: DE, grade: 2, power: 10000, shield: 5000, skill: 'intercept', race: 'Talisman', overDress: 'Trickstar',
+      text: '[overDress] - "Trickstar"\n[AUTO](RC): When this unit attacks a vanguard in the overDress state, it gets +10000 until end of that battle. Then, [COST: SB2], choose one of your opponent\'s rear-guards and retire it.',
+      abilities: [{
+        kind: 'AUTO', on: 'attack', zones: ['RC'], label: '+10000, may retire a rear-guard (SB2)',
+        cond: (g, x) => x.unit.od && g.battle.targetIsVC,
+        resolve: function* (g, x) {
+          g.addMod(x.unit, { power: 10000, until: 'battle' });
+          const o = 1 - x.p;
+          if (!g.canPay(x.p, { sb: 2 }) || !g.rearguards(o).some(r => !g.def(r.u.c).untargetableRC)) return;
+          if (!(yield* g.yesno(x.p, 'Vairina: pay SB2 to retire an opponent rear-guard?', 'ability', { cost: 'SB2', id: x.card.id }))) return;
+          yield* g.soulBlast(x.p, 2);
+          const circ = yield* g.chooseUnit(x.p, { owner: o, rearOnly: true, title: 'Choose an opponent rear-guard to retire', purpose: 'retire', alwaysAsk: true });
+          if (circ) g.retire(o, circ, 'Vairina');
+        }
+      }]
+    }),
+    'D-SD01/007': vanilla({ set: 'D-SD01', no: '007', name: 'Iron Ball Dragon, Ankybowler', nation: DE, grade: 1, power: 8000, shield: 5000, skill: 'boost', race: 'Dinodragon', text: '(No ability.)' }),
+    'D-SD01/008': vanilla({
+      set: 'D-SD01', no: '008', name: 'Escort Stealth Dragon, Hayashi Kaze', nation: DE, grade: 1, power: 7000, shield: 0, skill: 'boost', race: 'Abyss Dragon', sentinel: true,
+      text: SENTINEL_TEXT, abilities: [sentinel]
+    }),
+    'D-SD01/009': vanilla({ set: 'D-SD01', no: '009', name: 'Trickstar', nation: DE, grade: 0, power: 5000, shield: 5000, skill: 'boost', race: 'Talisman', text: '(No ability. overDress base for "Vairina" cards.)' }),
+    'D-SD01/010': trig({
+      set: 'D-SD01', no: '010', name: 'Spiritual King of Determination, Olbaria', nation: null, trigger: 'over', shield: 50000, race: 'Elemental',
+      text: 'Over Trigger (max 1 per deck): remove this card, draw 1, and one of your units gets +100 million until end of turn. Drive check additional effect: another of your units gets +100 million until end of turn.',
+      overExtra: function* (g, x) {
+        const circ = yield* g.chooseUnit(x.p, { title: 'Additional effect: +100 million to a unit', purpose: 'power', alwaysAsk: true });
+        if (circ) { g.addMod(g.unitAt(x.p, circ), { power: 100000000, until: 'turn' }); g.log(g.name(g.unitAt(x.p, circ).c) + ' +100M.', x.p); }
+      }
+    }),
+    'D-SD01/011': trig({ set: 'D-SD01', no: '011', name: 'Blaze Maiden, Zonne', nation: DE, trigger: 'crit', shield: 15000, race: 'Human', text: 'Critical Trigger: one unit gets critical +1 and one unit gets +10000 until end of turn.' }),
+    'D-SD01/012': trig({ set: 'D-SD01', no: '012', name: 'Blaze Staff Monk, Cho Kuu Sha', nation: DE, trigger: 'draw', shield: 5000, race: 'Human', text: 'Draw Trigger: draw 1, and one unit gets +10000 until end of turn.' }),
+    'D-SD01/013': trig({ set: 'D-SD01', no: '013', name: 'Blaze Fist Monk, Nikko', nation: DE, trigger: 'front', shield: 15000, race: 'Human', text: 'Front Trigger: all your front row units get +10000 until end of turn.' }),
+    'D-SD01/014': trig({ set: 'D-SD01', no: '014', name: 'Blaze Maiden, Rona', nation: DE, trigger: 'heal', shield: 15000, race: 'Human', text: 'Heal Trigger (max 4): one unit gets +10000; if your damage is equal to or greater than your opponent\'s, heal 1.' }),
+    'D-SD01/015': {
+      set: 'D-SD01', no: '015', name: 'Sunburst Evolution', nation: DE, type: 'order', grade: 2, power: 0, shield: 0, crit: 0, verified: true,
+      text: 'Normal Order. Play with [COST: CB1]. One of your units gets +5000 until end of turn. Choose a "Vairina" from your drop and put it into your hand.',
+      cost: { cb: 1 },
+      play: function* (g, x) {
+        const circ = yield* g.chooseUnit(x.p, { title: '+5000: choose a unit', purpose: 'power', alwaysAsk: true });
+        if (circ) g.addMod(g.unitAt(x.p, circ), { power: 5000, until: 'turn' });
+        const cs = yield* g.chooseFromZone(x.p, 'drop', { title: 'Choose a "Vairina" from your drop', filter: c => g.def(c).name === 'Vairina', min: 1, max: 1, purpose: 'fromDrop' });
+        for (const c of cs) { g.take(g.P(x.p).drop, c); g.P(x.p).hand.push(c); g.log(g.name(c) + ' returns to hand.', x.p); }
+      }
+    },
+    /* ================= D-BT01 ================= */
+    'D-BT01/011': vanilla({
+      set: 'D-BT01', no: '011', name: 'Vairina Arcs', nation: DE, grade: 2, power: 10000, shield: 5000, skill: 'intercept', race: 'Talisman', overDress: 'Trickstar',
+      text: '[overDress] - "Trickstar"\n[AUTO]: When this unit is placed on (RC), if it overDressed, [COST: CB1], draw 2 and this unit gets +5000 until end of turn.',
+      abilities: [{
+        kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'Draw 2 and +5000', cost: { cb: 1 }, cond: (g, x) => !!x.overDress,
+        resolve: function* (g, x) { g.draw(x.p, 2); g.addMod(x.unit, { power: 5000, until: 'turn' }); }
+      }]
+    }),
+    'D-BT01/007': vanilla({
+      set: 'D-BT01', no: '007', name: 'Grand Heavenly Sword, Alden', nation: KS, grade: 3, power: 13000, shield: 0, skill: 'twin', persona: true, race: 'Human',
+      text: '[AUTO]: When this unit is placed on (RC), [COST: CB2 & SB1], choose a card from your hand and call it to (RC). If you called a grade 3, draw 2.\n[AUTO](RC): When this unit attacks, if you have three or more grade 3 units, it gets +5000 until end of turn.',
+      abilities: [
+        {
+          kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'Call from hand (grade 3: draw 2)', cost: { cb: 2, sb: 1 },
+          cond: (g, x) => g.P(x.p).hand.some(c => g.def(c).type === 'unit'),
+          resolve: function* (g, x) {
+            const cs = yield* g.selectCards(x.p, g.P(x.p).hand.filter(c => g.def(c).type === 'unit'), { title: 'Alden: choose a card from your hand to call', min: 1, max: 1, purpose: 'callFromHand' });
+            if (!cs.length) return;
+            const circ = yield* g.chooseCircle(x.p, { title: 'Call ' + g.name(cs[0]) + ' to which circle?', card: cs[0] });
+            g.take(g.P(x.p).hand, cs[0]);
+            const g3 = g.def(cs[0]).grade === 3;
+            yield* g.callTo(x.p, cs[0], circ, 'hand');
+            if (g3) g.draw(x.p, 2);
+          }
+        },
+        {
+          kind: 'AUTO', on: 'attack', zones: ['RC'], label: '+5000 (3+ grade 3 units)',
+          cond: (g, x) => g.units(x.p).filter(s => g.def(s.u.c).grade === 3).length >= 3,
+          resolve: function* (g, x) { g.addMod(x.unit, { power: 5000, until: 'turn' }); }
+        }
+      ]
+    }),
+    'D-BT01/020': vanilla({
+      set: 'D-BT01', no: '020', name: 'Knight of War Damage, Fosado', nation: KS, grade: 3, power: 13000, shield: 0, skill: 'twin', persona: true, race: 'Elf', untargetableRC: true,
+      text: '[CONT](RC): This unit cannot be chosen by your opponent\'s card effects.\n[AUTO](RC): When this unit\'s attack hits, Counter Charge 1 and Soul Charge 1.',
+      abilities: [{ kind: 'AUTO', on: 'hit', zones: ['RC'], label: 'CC1 and SC1', resolve: function* (g, x) { g.counterCharge(x.p, 1); g.soulCharge(x.p, 1); } }]
+    }),
+    'D-BT01/103': trig({ set: 'D-BT01', no: '103', name: 'Exalting Knight, Eafred', nation: KS, trigger: 'draw', shield: 5000, race: 'Human', verified: false, text: 'Draw Trigger: draw 1, and one unit gets +10000 until end of turn.' }),
+
+    /* ================= D-SD03: Tohya Ebata -Apex Ruler- (Keter Sanctuary) ================= */
+    'D-SD03/001': vanilla({
+      set: 'D-SD03', no: '001', name: 'Apex Ruler, Bastion', nation: KS, grade: 3, power: 13000, shield: 0, skill: 'twin', persona: true, race: 'Human',
+      text: '[CONT](VC): During your turn, all your grade 3 units get +2000.\n[AUTO](VC)[1/turn]: At the end of the battle your drive check revealed a grade 3, [COST: discard 1], choose one of your rear-guards, [Stand] it, and it gets +10000 until end of turn.',
+      abilities: [
+        { kind: 'CONT', zones: ['VC'], power: (g, x) => (g.active === x.p && g.def(x.targetUnit.c).grade === 3) ? 2000 : 0 },
+        {
+          kind: 'AUTO', on: 'battleEndVC', zones: ['VC'], oncePerTurn: true, label: 'Stand a rear-guard, +10000', cost: { discard: 1 },
+          cond: (g, x) => g.battle.ap === x.p && g.battle.driveG3 && g.rearguards(x.p).length > 0,
+          resolve: function* (g, x) {
+            const circ = yield* g.chooseUnit(x.p, { rearOnly: true, title: 'Bastion: choose a rear-guard to stand', purpose: 'stand', alwaysAsk: true });
+            if (!circ) return;
+            const u = g.unitAt(x.p, circ); g.stand(u); g.addMod(u, { power: 10000, until: 'turn' });
+            g.log(g.name(u.c) + ' stands and gets +10000.', x.p);
+          }
+        }
+      ]
+    }),
+    'D-SD03/002': vanilla({
+      set: 'D-SD03', no: '002', name: 'Knight of Heavenly Spear, Rooks', nation: KS, grade: 2, power: 10000, shield: 5000, skill: 'intercept', race: 'Human', verified: false,
+      text: '[AUTO]: When this unit is rode upon by "Apex Ruler, Bastion", [COST: reveal three grade 3 cards from hand], draw 1.',
+      abilities: [{
+        kind: 'AUTO', on: 'rodeUpon', label: 'Draw 1', cond: (g, x) => g.def(x.newCard).name === 'Apex Ruler, Bastion',
+        cost: { reveal: { n: 3, label: 'grade 3 cards', filter: (g, c) => g.def(c).grade === 3 } },
+        resolve: function* (g, x) { g.draw(x.p, 1); }
+      }]
+    }),
+    'D-SD03/003': vanilla({
+      set: 'D-SD03', no: '003', name: 'Knight of Heavenly Sword, Fort', nation: KS, grade: 1, power: 8000, shield: 5000, skill: 'boost', race: 'Human', verified: false,
+      text: '[AUTO]: When this unit is rode upon by "Knight of Heavenly Spear, Rooks", [COST: reveal two grade 3 cards from hand], look at the top card of your deck; if it is a unit, call it to (RC), otherwise put it into your drop.',
+      abilities: [{
+        kind: 'AUTO', on: 'rodeUpon', label: 'Call the top card', cond: (g, x) => g.def(x.newCard).name === 'Knight of Heavenly Spear, Rooks',
+        cost: { reveal: { n: 2, label: 'grade 3 cards', filter: (g, c) => g.def(c).grade === 3 } },
+        resolve: function* (g, x) {
+          const pl = g.P(x.p); if (!pl.deck.length) return;
+          const c = pl.deck.shift(); pl.trig.push(c); g.log('Top card: ' + g.name(c) + '.', x.p);
+          if (g.def(c).type === 'unit') { const circ = yield* g.chooseCircle(x.p, { title: 'Call ' + g.name(c) + ' to which circle?', card: c }); g.take(pl.trig, c); yield* g.callTo(x.p, c, circ, 'deck'); }
+          else { g.take(pl.trig, c); pl.drop.push(c); }
+          g.checkRules();
+        }
+      }]
+    }),
+    'D-SD03/004': vanilla({
+      set: 'D-SD03', no: '004', name: 'Knight of Heavenly Bow, Base', nation: KS, grade: 0, power: 6000, shield: 5000, skill: 'boost', race: 'Human', verified: false,
+      text: '[AUTO]: When this unit is rode upon, if you went second, draw 1.', abilities: [firstVanguardDraw]
+    }),
+    'D-SD03/009': vanilla({
+      set: 'D-SD03', no: '009', name: 'Lifesaving Angel, Kurabiel', nation: KS, grade: 1, power: 7000, shield: 0, skill: 'boost', race: 'Angel', sentinel: true,
+      text: SENTINEL_TEXT, abilities: [sentinel]
+    }),
+    'D-SD03/011': trig({ set: 'D-SD03', no: '011', name: 'Knight of Heavenly Hammer, Gurgant', nation: KS, trigger: 'crit', shield: 15000, race: 'Human', verified: false, text: 'Critical Trigger: one unit gets critical +1 and one unit gets +10000 until end of turn.' }),
+    'D-SD03/013': trig({ set: 'D-SD03', no: '013', name: 'Knight of Heavenly Rend, Lif', nation: KS, trigger: 'front', shield: 15000, race: 'Human', verified: false, text: 'Front Trigger: all your front row units get +10000 until end of turn.' }),
+    'D-SD03/014': trig({ set: 'D-SD03', no: '014', name: 'Healer of Heavenly Staff, Arshes', nation: KS, trigger: 'heal', shield: 15000, race: 'Human', verified: false, text: 'Heal Trigger (max 4): one unit gets +10000; if your damage is equal to or greater than your opponent\'s, heal 1.' }),
+    /* ================= Other Keter cards used by the prebuilt deck ================= */
+    'D-TD03/002': vanilla({
+      set: 'D-TD03', no: '002', name: 'Knight of Ardent Light, Youth', nation: KS, grade: 2, power: 10000, shield: 5000, skill: 'intercept', race: 'Human',
+      text: '[AUTO]: When this unit is rode upon by a unit with [RevolDress], [COST: CB1], choose a grade 2 or greater card from your drop and put it into your hand.\n[AUTO](VC/RC): When this unit is boosted, [COST: SB1], it gets +5000 until end of that battle.',
+      abilities: [
+        {
+          kind: 'AUTO', on: 'rodeUpon', label: 'Return a grade 2+ from drop', cost: { cb: 1 }, cond: (g, x) => !!g.def(x.newCard).revolDress,
+          resolve: function* (g, x) {
+            const cs = yield* g.chooseFromZone(x.p, 'drop', { title: 'Choose a grade 2 or greater card from your drop', filter: c => g.def(c).grade >= 2, min: 1, max: 1, purpose: 'fromDrop' });
+            for (const c of cs) { g.take(g.P(x.p).drop, c); g.P(x.p).hand.push(c); }
+          }
+        },
+        { kind: 'AUTO', on: 'boosted', zones: ['VC', 'RC'], label: '+5000 this battle', cost: { sb: 1 }, resolve: function* (g, x) { g.addMod(x.unit, { power: 5000, until: 'battle' }); } }
+      ]
+    }),
+    'DZ-TD04/009': vanilla({ set: 'DZ-TD04', no: '009', name: 'Knight of Partings, Lloygre', nation: KS, grade: 2, power: 10000, shield: 5000, skill: 'intercept', race: 'Human', text: '(No ability.)' }),
+    'D-SS06/007': vanilla({
+      set: 'D-SS06', no: '007', name: 'Knight of Soaring Refinement, Dfyn', nation: KS, grade: 2, power: 10000, shield: 5000, skill: 'intercept', race: 'Human',
+      text: 'Abilities that only work with a "Gramgrace" vanguard (not in this prototype; here it plays as a unit with no ability).'
+    })
+  };
+
+  for (const id in CARDS) { CARDS[id].id = id; if (!CARDS[id].abilities) CARDS[id].abilities = []; }
+
+  const DECKS = {
+    nirvana: {
+      name: 'Nirvana (Dragon Empire)',
+      ride: ['D-SD01/004', 'D-SD01/003', 'D-SD01/002', 'D-SD01/001'],
+      counts: { 'D-SD01/001': 3, 'D-SD01/006': 4, 'D-BT01/011': 4, 'D-SD01/005': 4, 'D-SD01/007': 4, 'D-SD01/008': 4, 'D-SD01/009': 4, 'D-SD01/015': 3, 'D-SD01/011': 4, 'D-SD01/013': 4, 'D-SD01/014': 4, 'D-SD01/012': 3, 'D-SD01/010': 1 }
+    },
+    bastion: {
+      name: 'Bastion (Keter Sanctuary)',
+      ride: ['D-SD03/004', 'D-SD03/003', 'D-SD03/002', 'D-SD03/001'],
+      counts: { 'D-SD03/001': 3, 'D-BT01/007': 4, 'D-BT01/020': 4, 'D-SD03/002': 3, 'D-SD03/003': 3, 'D-SD03/009': 4, 'D-TD03/002': 4, 'DZ-TD04/009': 4, 'D-SS06/007': 1, 'D-SD03/011': 4, 'D-SD03/013': 4, 'D-SD03/014': 4, 'D-BT01/103': 3, 'D-SD01/010': 1 }
+    }
+  };
+  function expandDeck(d) { const main = []; for (const id in d.counts) for (let i = 0; i < d.counts[id]; i++) main.push(id); return { ride: d.ride.slice(), main }; }
+
+  const api = { CARDS, DECKS, expandDeck };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.VGCards = api;
+})(this);
+
+;
+/* Vanguard Standard (D/DZ) rules engine — generator-driven, deterministic with seed. */
+(function (root) {
+  'use strict';
+  const RCS = ['FL', 'FR', 'BL', 'BC', 'BR'];
+  const CIRCS = ['VC', 'FL', 'FR', 'BL', 'BC', 'BR'];
+  const FRONT = ['VC', 'FL', 'FR'];
+  const BEHIND = { VC: 'BC', FL: 'BL', FR: 'BR' };
+  const COLS = { L: ['FL', 'BL'], R: ['FR', 'BR'] };
+  const CIRC_PT = { VC: 'VC', FL: 'Front-left RC', FR: 'Front-right RC', BL: 'Back-left RC', BC: 'Back-center RC', BR: 'Back-right RC' };
+  const TRIG_PT = { crit: 'Critical', draw: 'Draw', front: 'Front', heal: 'Heal', over: 'Over' };
+
+  class GameOver { constructor(winner, reason) { this.winner = winner; this.reason = reason; } }
+
+  function mulberry(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  class Game {
+    constructor(db, decks, opts) {
+      opts = opts || {};
+      this.db = db;
+      this.seed = opts.seed != null ? opts.seed : (Math.random() * 4294967295) >>> 0;
+      this.rand = mulberry(this.seed);
+      this.uid = 1;
+      this.names = opts.names || ['Player 1', 'Player 2'];
+      this.players = [0, 1].map(i => this._mkPlayer(i, decks[i]));
+      this.turn = 0; this.active = 0; this.first = 0;
+      this.phase = 'setup'; this.logs = []; this.winner = null; this.reason = null;
+      this.battle = null; this.tf = { persona: [false, false], orderPlayed: [false, false], used: new Set() };
+      this.prompt = null; this.over = false;
+      this.gen = this._main();
+    }
+
+    /* ---------- basics ---------- */
+    _mkPlayer(i, deck) {
+      const mk = id => {
+        if (!this.db[id]) throw new Error('Unknown card: ' + id);
+        return { iid: this.uid++, id };
+      };
+      return {
+        idx: i, deck: deck.main.map(mk), rideDeck: deck.ride.map(mk), hand: [], drop: [], damage: [], soul: [],
+        removed: [], trig: [], vc: null, rc: { FL: null, FR: null, BL: null, BC: null, BR: null }, gc: [], wentSecond: false
+      };
+    }
+    start() { this._step(undefined); return this; }
+    answer(v) { if (this.over) return; this._step(v); }
+    _step(v) {
+      const r = this.gen.next(v);
+      this.prompt = r.done ? null : r.value;
+      if (r.done) this.over = true;
+    }
+    def(c) { return this.db[c.id]; }
+    P(i) { return this.players[i]; }
+    name(c) { return this.def(c).name; }
+    log(t, p) { this.logs.push({ t, p: p == null ? -1 : p, turn: this.turn }); }
+    shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(this.rand() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+    unitAt(p, c) { const pl = this.P(p); return c === 'VC' ? pl.vc : pl.rc[c]; }
+    setUnit(p, c, u) { const pl = this.P(p); if (c === 'VC') pl.vc = u; else pl.rc[c] = u; }
+    units(p) { const out = []; for (const c of CIRCS) { const u = this.unitAt(p, c); if (u) out.push({ circ: c, u }); } return out; }
+    rearguards(p) { return this.units(p).filter(x => x.circ !== 'VC'); }
+    circOf(p, u) { for (const c of CIRCS) if (this.unitAt(p, c) === u) return c; return null; }
+    vgGrade(p) { return this.def(this.P(p).vc.c).grade; }
+    take(arr, card) { const i = arr.indexOf(card); if (i < 0) throw new Error('Card not in zone'); arr.splice(i, 1); return card; }
+    mkUnit(c) { return { c, rested: false, mods: [], under: [], od: false, noHit: false }; }
+    faceUpDamage(p) { return this.P(p).damage.filter(d => d.faceUp).length; }
+
+    /* ---------- stats ---------- */
+    zoneOk(ab, circ) { if (!ab.zones) return true; return ab.zones.includes(circ === 'VC' ? 'VC' : (circ === 'GC' ? 'GC' : 'RC')); }
+    power(p, circ) {
+      const u = this.unitAt(p, circ); if (!u) return 0;
+      let v = this.def(u.c).power || 0;
+      for (const m of u.mods) v += m.power || 0;
+      for (const s of this.units(p)) for (const ab of (this.def(s.u.c).abilities || [])) {
+        if (ab.kind === 'CONT' && ab.power && this.zoneOk(ab, s.circ)) v += ab.power(this, { p, unit: s.u, circ: s.circ, target: circ, targetUnit: u }) || 0;
+      }
+      if (this.tf.persona[p] && FRONT.includes(circ)) v += 10000;
+      return v;
+    }
+    crit(p, circ) {
+      const u = this.unitAt(p, circ); if (!u) return 0;
+      let v = this.def(u.c).crit || 0; for (const m of u.mods) v += m.crit || 0; return Math.max(0, v);
+    }
+    gcShield(g) { let v = this.def(g.c).shield || 0; for (const m of g.mods) v += m.shield || 0; return v; }
+    totalShield(p) { return this.P(p).gc.reduce((s, g) => s + this.gcShield(g), 0); }
+    addMod(u, m) { u.mods.push(m); }
+    expire(until) {
+      for (const pl of this.players) {
+        for (const c of CIRCS) { const u = c === 'VC' ? pl.vc : pl.rc[c]; if (u) u.mods = u.mods.filter(m => m.until !== until); }
+        for (const g of pl.gc) g.mods = g.mods.filter(m => m.until !== until);
+      }
+    }
+    attackPower() {
+      const b = this.battle; if (!b) return 0;
+      const ac = this.circOf(b.ap, b.aUnit); if (!ac) return 0;
+      let v = this.power(b.ap, ac);
+      if (b.bUnit) { const bc = this.circOf(b.ap, b.bUnit); if (bc) v += this.power(b.ap, bc); }
+      return v;
+    }
+    defensePower() {
+      const b = this.battle; if (!b) return 0;
+      const tc = this.circOf(b.tp, b.tUnit); if (!tc) return 0;
+      return this.power(b.tp, tc) + this.totalShield(b.tp);
+    }
+
+    /* ---------- rules check ---------- */
+    checkRules() {
+      const lose = [0, 1].map(i => this.P(i).damage.length >= 6 || this.P(i).deck.length === 0);
+      if (lose[0] && lose[1]) throw new GameOver(-1, 'Draw');
+      if (lose[0] || lose[1]) {
+        const l = lose[0] ? 0 : 1; const pl = this.P(l);
+        throw new GameOver(1 - l, pl.damage.length >= 6 ? '6 damage' : 'deck out');
+      }
+    }
+
+    /* ---------- resource ops ---------- */
+    draw(p, n) {
+      n = n || 1; const pl = this.P(p);
+      for (let i = 0; i < n; i++) { if (!pl.deck.length) break; pl.hand.push(pl.deck.shift()); }
+      this.log(this.names[p] + ' draws ' + n + ' card' + (n > 1 ? 's' : '') + '.', p);
+      this.checkRules();
+    }
+    soulCharge(p, n) {
+      const pl = this.P(p); for (let i = 0; i < n; i++) { if (!pl.deck.length) break; pl.soul.push(pl.deck.shift()); }
+      this.log(this.names[p] + ': Soul-Charge ' + n + '.', p); this.checkRules();
+    }
+    counterBlast(p, n) {
+      const d = this.P(p).damage; let k = 0;
+      for (const x of d) { if (k >= n) break; if (x.faceUp) { x.faceUp = false; k++; } }
+      this.log(this.names[p] + ': Counter-Blast ' + n + '.', p);
+    }
+    counterCharge(p, n) {
+      const d = this.P(p).damage; let k = 0;
+      for (let i = d.length - 1; i >= 0 && k < n; i--) if (!d[i].faceUp) { d[i].faceUp = true; k++; }
+      this.log(this.names[p] + ': Counter-Charge ' + k + '.', p);
+    }
+    *soulBlast(p, n) {
+      const pl = this.P(p); let chosen;
+      if (pl.soul.length <= n) chosen = pl.soul.slice();
+      else chosen = yield* this.selectCards(p, pl.soul, { title: 'Soul Blast ' + n + ': choose cards from your soul', min: n, max: n, purpose: 'soulblast' });
+      for (const c of chosen) { this.take(pl.soul, c); pl.drop.push(c); }
+      this.log(this.names[p] + ': Soul-Blast ' + n + '.', p);
+    }
+    *discard(p, n, title, exclude) {
+      const pl = this.P(p); const pool = pl.hand.filter(c => !exclude || !exclude.includes(c));
+      const chosen = yield* this.selectCards(p, pool, { title: title || ('Discard ' + n + ' card(s)'), min: n, max: n, purpose: 'discard' });
+      for (const c of chosen) { this.take(pl.hand, c); pl.drop.push(c); this.log(this.names[p] + ' discards ' + this.name(c) + '.', p); }
+      return chosen;
+    }
+    canPay(p, cost, exclude) {
+      if (!cost) return true; const pl = this.P(p);
+      if (cost.cb && this.faceUpDamage(p) < cost.cb) return false;
+      if (cost.sb && pl.soul.length < cost.sb) return false;
+      const handN = pl.hand.filter(c => !exclude || !exclude.includes(c)).length;
+      if (cost.discard && handN < cost.discard) return false;
+      if (cost.reveal && pl.hand.filter(cost.reveal.filter.bind(null, this)).length < cost.reveal.n) return false;
+      return true;
+    }
+    costText(cost) {
+      if (!cost) return 'no cost'; const t = [];
+      if (cost.cb) t.push('CB' + cost.cb); if (cost.sb) t.push('SB' + cost.sb);
+      if (cost.discard) t.push('discard ' + cost.discard); if (cost.reveal) t.push('reveal ' + cost.reveal.n + ' ' + cost.reveal.label);
+      return t.join(' + ');
+    }
+    *pay(p, cost, exclude) {
+      if (!cost) return;
+      if (cost.reveal) {
+        const pl = this.P(p);
+        const cs = yield* this.selectCards(p, pl.hand.filter(cost.reveal.filter.bind(null, this)), { title: 'Reveal ' + cost.reveal.n + ' ' + cost.reveal.label, min: cost.reveal.n, max: cost.reveal.n, purpose: 'reveal' });
+        this.log(this.names[p] + ' reveals: ' + cs.map(c => this.name(c)).join(', ') + '.', p);
+      }
+      if (cost.cb) this.counterBlast(p, cost.cb);
+      if (cost.sb) yield* this.soulBlast(p, cost.sb);
+      if (cost.discard) yield* this.discard(p, cost.discard, 'Cost: discard ' + cost.discard, exclude);
+    }
+
+    /* ---------- generic choices ---------- */
+    *selectCards(p, cards, o) {
+      if (o.max === 0 || !cards.length) return [];
+      const min = Math.min(o.min == null ? 1 : o.min, cards.length);
+      const max = Math.min(o.max == null ? 1 : o.max, cards.length);
+      const items = cards.map(c => ({ key: 'c' + c.iid, label: this.name(c), id: c.id, iid: c.iid }));
+      const ans = yield { type: 'select', player: p, title: o.title, items, min, max, purpose: o.purpose || '' };
+      const keys = this._validKeys(ans, items, min, max);
+      return keys.map(k => cards.find(c => 'c' + c.iid === k));
+    }
+    _validKeys(ans, items, min, max) {
+      let keys = Array.isArray(ans) ? ans.filter((k, i, a) => items.some(it => it.key === k) && a.indexOf(k) === i) : [];
+      if (keys.length > max) keys = keys.slice(0, max);
+      if (keys.length < min) { for (const it of items) { if (keys.length >= min) break; if (!keys.includes(it.key)) keys.push(it.key); } }
+      return keys;
+    }
+    *chooseUnit(p, o) {
+      const owner = o.owner == null ? p : o.owner;
+      let list = this.units(owner);
+      if (o.rearOnly) list = list.filter(x => x.circ !== 'VC');
+      if (o.filter) list = list.filter(x => o.filter(x));
+      if (owner !== p) list = list.filter(x => !(x.circ !== 'VC' && this.def(x.u.c).untargetableRC));
+      if (!list.length) return null;
+      const items = list.map(x => ({ key: owner + ':' + x.circ, label: this.name(x.u.c) + ' (' + CIRC_PT[x.circ] + ')', id: x.u.c.id, circ: x.circ, owner }));
+      const min = o.optional ? 0 : 1;
+      if (items.length === 1 && !o.optional && !o.alwaysAsk) return list[0].circ;
+      const ans = yield { type: 'select', player: p, title: o.title, items, min, max: 1, purpose: o.purpose || 'unit', owner };
+      const keys = this._validKeys(ans, items, min, 1);
+      return keys.length ? keys[0].split(':')[1] : null;
+    }
+    *chooseCircle(p, o) {
+      const circles = o.circles || RCS;
+      const items = circles.map(c => { const u = this.unitAt(p, c); return { key: 'circ:' + c, circ: c, label: CIRC_PT[c] + (u ? ' (replaces ' + this.name(u.c) + ')' : ' (empty)') }; });
+      const ans = yield { type: 'select', player: p, title: o.title || 'Choose a circle', items, min: 1, max: 1, purpose: 'circle', card: o.card ? o.card.id : null };
+      return this._validKeys(ans, items, 1, 1)[0].slice(5);
+    }
+    *chooseFromZone(p, zone, o) {
+      const arr = this.P(p)[zone]; const pool = o.filter ? arr.filter(o.filter) : arr.slice();
+      return yield* this.selectCards(p, pool, o);
+    }
+    *searchDeck(p, o) {
+      const pl = this.P(p); const pool = pl.deck.filter(o.filter);
+      const cs = yield* this.selectCards(p, pool, { title: o.title, min: 0, max: o.max || 1, purpose: o.purpose || 'search' });
+      for (const c of cs) { this.take(pl.deck, c); pl.trig.push(c); }
+      this.shuffle(pl.deck);
+      return cs; // found cards wait in pl.trig until the caller moves them
+    }
+    *yesno(p, title, purpose, extra) {
+      const ans = yield Object.assign({ type: 'yesno', player: p, title, purpose: purpose || '' }, extra || {});
+      return !!ans;
+    }
+
+    /* ---------- field ops ---------- */
+    retire(p, circ, why) {
+      const u = this.unitAt(p, circ); if (!u) return;
+      const pl = this.P(p); pl.drop.push(u.c, ...u.under); this.setUnit(p, circ, null);
+      this.log(this.name(u.c) + ' is retired' + (why ? ' (' + why + ')' : '') + '.', p);
+    }
+    *callTo(p, card, circ, from) {
+      if (this.unitAt(p, circ)) this.retire(p, circ, 'replaced');
+      const u = this.mkUnit(card); this.setUnit(p, circ, u);
+      this.log(this.names[p] + ' calls ' + this.name(card) + ' to ' + CIRC_PT[circ] + '.', p);
+      yield* this.fire('placedRC', { p, unit: u, circ, from });
+    }
+    *overDress(p, card, circ) {
+      const old = this.unitAt(p, circ); const u = this.mkUnit(card);
+      u.under = [old.c, ...old.under]; u.od = true; this.setUnit(p, circ, u);
+      this.log(this.names[p] + ' overDresses ' + this.name(card) + ' onto ' + this.name(old.c) + '.', p);
+      yield* this.fire('placedRC', { p, unit: u, circ, from: 'hand', overDress: true });
+    }
+    stand(u) { u.rested = false; }
+
+    /* ---------- abilities ---------- */
+    _collect(ev, ctx) {
+      const out = [];
+      const add = (p, card, unit, circ) => {
+        (this.def(card).abilities || []).forEach((ab, i) => {
+          if (ab.kind !== 'AUTO' || ab.on !== ev) return;
+          if (circ && !this.zoneOk(ab, circ)) return;
+          out.push({ p, ab, card, unit, i });
+        });
+      };
+      switch (ev) {
+        case 'rodeUpon': add(ctx.p, ctx.oldCard, null, null); break;
+        case 'placedVC': case 'placedRC': add(ctx.p, ctx.unit.c, ctx.unit, ctx.circ); break;
+        case 'attack': case 'boosted': case 'hit': case 'battleEnd': {
+          const b = this.battle; const c = this.circOf(b.ap, b.aUnit); if (c) add(b.ap, b.aUnit.c, b.aUnit, c); break;
+        }
+        case 'boost': { const b = this.battle; const c = b.bUnit && this.circOf(b.ap, b.bUnit); if (c) add(b.ap, b.bUnit.c, b.bUnit, c); break; }
+        case 'battleEndVC': { const p = this.battle.ap; add(p, this.P(p).vc.c, this.P(p).vc, 'VC'); break; }
+        case 'putOnGC': add(ctx.p, ctx.g.c, ctx.g, 'GC'); break;
+      }
+      return out;
+    }
+    *fire(ev, ctx) {
+      const list = this._collect(ev, ctx);
+      for (const it of list) {
+        const { p, ab, card, unit } = it;
+        const key = card.iid + ':' + it.i;
+        if (ab.oncePerTurn && this.tf.used.has(key)) continue;
+        if (unit && ev !== 'putOnGC' && !this.circOf(p, unit)) continue;
+        const x = Object.assign({}, ctx, { p, unit, card, circ: unit ? this.circOf(p, unit) : null });
+        if (ab.cond && !ab.cond(this, x)) continue;
+        if (ab.cost || ab.optional) {
+          if (!this.canPay(p, ab.cost)) continue;
+          const ok = yield* this.yesno(p, this.name(card) + ': ' + ab.label, 'ability', { cost: this.costText(ab.cost), id: card.id, ev });
+          if (!ok) continue;
+          if (ab.oncePerTurn) this.tf.used.add(key);
+          yield* this.pay(p, ab.cost);
+        } else if (ab.oncePerTurn) this.tf.used.add(key);
+        this.log('⚡ ' + this.name(card) + ': ' + ab.label, p);
+        yield* ab.resolve(this, x);
+        this.checkRules();
+      }
+    }
+
+    /* ---------- setup ---------- */
+    *_setup() {
+      this.phase = 'setup';
+      this.first = this.rand() < 0.5 ? 0 : 1; this.active = this.first;
+      this.P(1 - this.first).wentSecond = true;
+      for (const pl of this.players) {
+        const g0 = pl.rideDeck.find(c => this.def(c).grade === 0);
+        this.take(pl.rideDeck, g0); pl.vc = this.mkUnit(g0); pl.vc.faceDown = true;
+        this.shuffle(pl.deck);
+        for (let i = 0; i < 5; i++) pl.hand.push(pl.deck.shift());
+      }
+      this.log(this.names[this.first] + ' goes first.', this.first);
+      for (const p of [this.first, 1 - this.first]) {
+        const pl = this.P(p);
+        const items = pl.hand.map(c => ({ key: 'c' + c.iid, label: this.name(c), id: c.id, iid: c.iid }));
+        const ans = yield { type: 'mulligan', player: p, title: 'Mulligan: choose cards to return', items, min: 0, max: items.length, purpose: 'mulligan' };
+        const keys = this._validKeys(ans, items, 0, items.length);
+        const back = keys.map(k => pl.hand.find(c => 'c' + c.iid === k));
+        for (const c of back) { this.take(pl.hand, c); }
+        for (let i = 0; i < back.length; i++) pl.hand.push(pl.deck.shift());
+        pl.deck.push(...back); this.shuffle(pl.deck);
+        this.log(this.names[p] + ' redraws ' + back.length + ' card(s).', p);
+      }
+      for (const pl of this.players) pl.vc.faceDown = false;
+      this.log('STAND UP! VANGUARD!');
+    }
+
+    /* ---------- turn ---------- */
+    *_main() {
+      try {
+        yield* this._setup();
+        for (;;) {
+          this.turn++;
+          const p = this.active;
+          this.tf = { persona: [false, false], orderPlayed: [false, false], used: new Set() };
+          this.log('— Turn ' + this.turn + ' (' + this.names[p] + ') —', p);
+          this.phase = 'stand'; for (const x of this.units(p)) x.u.rested = false;
+          this.phase = 'draw'; this.draw(p, 1);
+          this.phase = 'ride'; yield* this._ridePhase(p);
+          this.phase = 'main'; yield* this._mainPhase(p);
+          if (this.turn > 1) { this.phase = 'battle'; yield* this._battlePhase(p); }
+          this.phase = 'end'; this.expire('battle'); this.expire('turn');
+          this.active = 1 - p;
+          if (this.turn >= 120) throw new GameOver(-1, 'turn limit');
+        }
+      } catch (e) {
+        if (!(e instanceof GameOver)) throw e;
+        this.winner = e.winner; this.reason = e.reason; this.phase = 'over'; this.over = true;
+        this.log(e.winner < 0 ? 'Draw (' + e.reason + ').' : this.names[e.winner] + ' wins! (' + e.reason + ')');
+      }
+    }
+
+    rideOptions(p) {
+      const pl = this.P(p); const g = this.vgGrade(p); const opts = [];
+      const nx = pl.rideDeck.find(c => this.def(c).grade === g + 1);
+      if (nx && pl.hand.length >= 1) opts.push({ key: 'rd', kind: 'rideDeck', iid: nx.iid, id: nx.id, label: 'Ride Deck: ' + this.name(nx) + ' (discard 1)' });
+      for (const c of pl.hand) {
+        const d = this.def(c);
+        if (d.type !== 'unit') continue;
+        if (d.grade === g || d.grade === g + 1) {
+          const persona = d.name === this.name(pl.vc.c) && this.def(pl.vc.c).persona;
+          opts.push({ key: 'h' + c.iid, kind: 'hand', iid: c.iid, id: c.id, persona, label: 'From hand: ' + d.name + (persona ? ' (Persona Ride!)' : '') });
+        }
+      }
+      opts.push({ key: 'skip', kind: 'skip', label: 'Don\'t ride' });
+      return opts;
+    }
+    *_ridePhase(p) {
+      const opts = this.rideOptions(p);
+      if (opts.length === 1) return;
+      const ans = yield { type: 'ride', player: p, title: 'Ride Phase', options: opts };
+      const o = opts.find(x => x.key === ans) || opts[opts.length - 1];
+      if (o.kind === 'skip') return;
+      const pl = this.P(p);
+      if (o.kind === 'rideDeck') {
+        yield* this.discard(p, 1, 'Ride Deck: discard 1 card');
+        const c = pl.rideDeck.find(x => x.iid === o.iid); this.take(pl.rideDeck, c);
+        yield* this.ride(p, c, true);
+      } else {
+        const c = pl.hand.find(x => x.iid === o.iid); this.take(pl.hand, c);
+        yield* this.ride(p, c, false);
+      }
+    }
+    *ride(p, card, fromRideDeck) {
+      const pl = this.P(p); const old = pl.vc;
+      const persona = !fromRideDeck && this.name(card) === this.name(old.c) && !!this.def(old.c).persona;
+      pl.soul.push(old.c, ...old.under);
+      const u = this.mkUnit(card); u.rested = old.rested; pl.vc = u;
+      this.log(this.names[p] + ' rides ' + this.name(card) + (fromRideDeck ? ' (Ride Deck)' : '') + '.', p);
+      if (persona) { this.tf.persona[p] = true; this.log('PERSONA RIDE! Front row +10000 and draw 1.', p); this.draw(p, 1); }
+      yield* this.fire('rodeUpon', { p, oldCard: old.c, newCard: card });
+      if (this.P(p).vc === u) yield* this.fire('placedVC', { p, unit: u, circ: 'VC' });
+    }
+
+    mainActions(p) {
+      const pl = this.P(p); const g = this.vgGrade(p); const acts = [];
+      for (const c of pl.hand) {
+        const d = this.def(c);
+        if (d.type === 'unit' && d.grade <= g) {
+          for (const circ of RCS) acts.push({ key: 'call:' + c.iid + ':' + circ, kind: 'call', iid: c.iid, id: c.id, circ, label: 'Call ' + d.name + ' → ' + CIRC_PT[circ] });
+          if (d.overDress) for (const circ of RCS) {
+            const u = pl.rc[circ];
+            if (u && this.name(u.c) === d.overDress) acts.push({ key: 'od:' + c.iid + ':' + circ, kind: 'od', iid: c.iid, id: c.id, circ, label: 'overDress ' + d.name + ' → ' + CIRC_PT[circ] });
+          }
+        }
+        if (d.type === 'order' && d.grade <= g && !this.tf.orderPlayed[p] && this.canPay(p, d.cost, [c]) && (!d.canPlay || d.canPlay(this, { p, card: c })))
+          acts.push({ key: 'order:' + c.iid, kind: 'order', iid: c.iid, id: c.id, label: 'Play order ' + d.name });
+      }
+      for (const col of ['L', 'R']) {
+        const [f, b] = COLS[col];
+        if (pl.rc[f] || pl.rc[b]) acts.push({ key: 'move:' + col, kind: 'move', col, label: 'Move ' + (col === 'L' ? 'left' : 'right') + ' column' });
+      }
+      for (const x of this.units(p)) {
+        (this.def(x.u.c).abilities || []).forEach((ab, i) => {
+          if (ab.kind !== 'ACT' || !this.zoneOk(ab, x.circ)) return;
+          if (ab.oncePerTurn && this.tf.used.has(x.u.c.iid + ':' + i)) return;
+          if (!this.canPay(p, ab.cost)) return;
+          if (ab.cond && !ab.cond(this, { p, unit: x.u, circ: x.circ, card: x.u.c })) return;
+          acts.push({ key: 'act:' + x.circ + ':' + i, kind: 'act', circ: x.circ, i, id: x.u.c.id, label: this.name(x.u.c) + ': ' + ab.label + ' [' + this.costText(ab.cost) + ']' });
+        });
+      }
+      acts.push({ key: 'end', kind: 'end', label: 'Go to battle' });
+      return acts;
+    }
+    *_mainPhase(p) {
+      for (let guard = 0; guard < 200; guard++) {
+        const acts = this.mainActions(p);
+        const ans = yield { type: 'main', player: p, title: 'Main Phase', actions: acts };
+        const a = acts.find(x => x.key === ans);
+        if (!a || a.kind === 'end') return;
+        const pl = this.P(p);
+        if (a.kind === 'call') {
+          const c = pl.hand.find(x => x.iid === a.iid); this.take(pl.hand, c);
+          yield* this.callTo(p, c, a.circ, 'hand');
+        } else if (a.kind === 'od') {
+          const c = pl.hand.find(x => x.iid === a.iid); this.take(pl.hand, c);
+          yield* this.overDress(p, c, a.circ);
+        } else if (a.kind === 'move') {
+          const [f, b] = COLS[a.col]; const t = pl.rc[f]; pl.rc[f] = pl.rc[b]; pl.rc[b] = t;
+          this.log(this.names[p] + ' moves the ' + (a.col === 'L' ? 'left' : 'right') + ' column.', p);
+        } else if (a.kind === 'act') {
+          const u = this.unitAt(p, a.circ); const ab = this.def(u.c).abilities[a.i];
+          if (ab.oncePerTurn) this.tf.used.add(u.c.iid + ':' + a.i);
+          yield* this.pay(p, ab.cost);
+          this.log('⚡ ' + this.name(u.c) + ': ' + ab.label, p);
+          yield* ab.resolve(this, { p, unit: u, circ: this.circOf(p, u), card: u.c });
+        } else if (a.kind === 'order') {
+          const c = pl.hand.find(x => x.iid === a.iid); const d = this.def(c);
+          this.take(pl.hand, c); this.tf.orderPlayed[p] = true; pl.trig.push(c);
+          this.log(this.names[p] + ' plays the order ' + d.name + '.', p);
+          yield* this.pay(p, d.cost);
+          this.take(pl.trig, c); pl.drop.push(c);
+          yield* d.play(this, { p, card: c });
+        }
+        this.checkRules();
+      }
+    }
+
+    attackActions(p) {
+      const o = 1 - p; const acts = [];
+      for (const a of FRONT) {
+        const u = this.unitAt(p, a); if (!u || u.rested) continue;
+        for (const t of FRONT) { const tu = this.unitAt(o, t); if (tu) acts.push({ key: 'atk:' + a + ':' + t, kind: 'attack', a, t, id: u.c.id, label: this.name(u.c) + ' attacks ' + this.name(tu.c) }); }
+      }
+      acts.push({ key: 'end', kind: 'end', label: 'End turn' });
+      return acts;
+    }
+    *_battlePhase(p) {
+      for (let guard = 0; guard < 40; guard++) {
+        const acts = this.attackActions(p);
+        if (acts.length === 1) return;
+        const ans = yield { type: 'attack', player: p, title: 'Battle Phase', actions: acts };
+        const a = acts.find(x => x.key === ans);
+        if (!a || a.kind === 'end') return;
+        yield* this._battle(p, a.a, a.t);
+      }
+    }
+    guardActions(d) {
+      const b = this.battle; const pl = this.P(d); const acts = [];
+      for (const c of pl.hand) if (this.def(c).type === 'unit') acts.push({ key: 'g' + c.iid, kind: 'guard', iid: c.iid, id: c.id, shield: this.def(c).shield || 0, label: 'Guard with ' + this.name(c) + ' (' + (this.def(c).shield || 0) + ')' });
+      for (const c of ['FL', 'FR']) {
+        const u = pl.rc[c];
+        if (u && u !== b.tUnit && this.def(u.c).skill === 'intercept') acts.push({ key: 'i' + c, kind: 'intercept', circ: c, id: u.c.id, shield: this.def(u.c).shield || 0, label: 'Intercept with ' + this.name(u.c) });
+      }
+      acts.push({ key: 'done', kind: 'done', label: 'Confirm guard' });
+      return acts;
+    }
+    *_battle(p, a, t) {
+      const o = 1 - p; const aUnit = this.unitAt(p, a); const tUnit = this.unitAt(o, t);
+      this.battle = { ap: p, tp: o, aUnit, tUnit, bUnit: null, targetIsVC: t === 'VC', drive: [], driveG3: false, hit: false };
+      aUnit.rested = true;
+      this.log(this.name(aUnit.c) + ' attacks ' + this.name(tUnit.c) + '!', p);
+      // boost
+      const bc = BEHIND[a]; const bu = this.unitAt(p, bc);
+      if (bu && !bu.rested && this.def(bu.c).skill === 'boost') {
+        const ok = yield* this.yesno(p, 'Boost with ' + this.name(bu.c) + '?', 'boost', { id: bu.c.id });
+        if (ok) { bu.rested = true; this.battle.bUnit = bu; this.log(this.name(bu.c) + ' boosts.', p); }
+      }
+      yield* this.fire('attack', {});
+      if (this.battle.bUnit) { yield* this.fire('boost', {}); yield* this.fire('boosted', {}); }
+      // guard step
+      if (this.circOf(p, aUnit) && this.circOf(o, tUnit)) {
+        for (let k = 0; k < 60; k++) {
+          const acts = this.guardActions(o);
+          const ans = yield { type: 'guard', player: o, title: 'Guard', actions: acts, atk: this.attackPower(), def: this.defensePower(), crit: this.crit(p, this.circOf(p, aUnit)) };
+          const g = acts.find(x => x.key === ans);
+          if (!g || g.kind === 'done') break;
+          const pl = this.P(o);
+          if (g.kind === 'guard') {
+            const c = pl.hand.find(x => x.iid === g.iid); this.take(pl.hand, c);
+            const gu = { c, mods: [] }; pl.gc.push(gu);
+            this.log(this.names[o] + ' guards with ' + this.name(c) + '.', o);
+            yield* this.fire('putOnGC', { p: o, g: gu });
+          } else {
+            const u = pl.rc[g.circ]; pl.rc[g.circ] = null;
+            pl.drop.push(...u.under);
+            pl.gc.push({ c: u.c, mods: [] });
+            this.log(this.name(u.c) + ' intercepts.', o);
+          }
+          this.checkRules();
+        }
+      }
+      // drive step
+      const vcAtk = this.circOf(p, aUnit) === 'VC';
+      if (vcAtk) {
+        const d = this.def(aUnit.c); const n = d.skill === 'triple' ? 3 : d.skill === 'twin' ? 2 : 1;
+        for (let i = 0; i < n; i++) {
+          const pl = this.P(p); if (!pl.deck.length) break;
+          const c = pl.deck.shift(); this.battle.drive.push(c.id);
+          if (this.def(c).grade === 3) this.battle.driveG3 = true;
+          this.log('Drive check: ' + this.name(c) + (this.def(c).trigger ? ' [' + TRIG_PT[this.def(c).trigger] + ']' : ''), p);
+          pl.trig.push(c);
+          const kept = yield* this.triggerCheck(p, c, 'drive');
+          if (pl.trig.includes(c)) this.take(pl.trig, c);
+          if (kept) pl.hand.push(c);
+          this.checkRules();
+        }
+      }
+      // damage step
+      const ac = this.circOf(p, aUnit); const tc = this.circOf(o, tUnit);
+      if (ac && tc) {
+        const atk = this.attackPower(); const df = this.defensePower();
+        const hit = atk >= df && !tUnit.noHit;
+        this.battle.hit = hit;
+        this.log((hit ? 'HIT' : (tUnit.noHit && atk >= df ? 'Blocked by sentinel' : 'Guarded')) + ' (' + fmt(atk) + ' vs ' + fmt(df) + ').', p);
+        if (hit) {
+          if (tc === 'VC') {
+            const n = this.crit(p, ac);
+            for (let i = 0; i < n; i++) {
+              const pl = this.P(o); if (!pl.deck.length) break;
+              const c = pl.deck.shift();
+              this.log('Damage check: ' + this.name(c) + (this.def(c).trigger ? ' [' + TRIG_PT[this.def(c).trigger] + ']' : ''), o);
+              pl.trig.push(c);
+              const kept = yield* this.triggerCheck(o, c, 'damage');
+              if (pl.trig.includes(c)) this.take(pl.trig, c);
+              if (kept) pl.damage.push({ c, faceUp: true });
+              this.checkRules();
+            }
+          } else this.retire(o, tc, 'attack');
+          yield* this.fire('hit', {});
+        }
+      }
+      // close step
+      yield* this.fire('battleEnd', {});
+      yield* this.fire('battleEndVC', {});
+      for (const pl of this.players) { for (const g of pl.gc) pl.drop.push(g.c); pl.gc = []; }
+      if (tUnit) tUnit.noHit = false;
+      this.expire('battle');
+      this.battle = null;
+      this.checkRules();
+    }
+
+    /* returns true if the card should go to its normal destination (hand / damage) */
+    *triggerCheck(p, c, mode) {
+      const d = this.def(c); const pl = this.P(p); const o = 1 - p;
+      if (!d.trigger) return true;
+      const pw = function* (g, amount, title) {
+        const circ = yield* g.chooseUnit(p, { title: title || ('+' + fmt(amount) + ' power: choose a unit'), purpose: 'power', alwaysAsk: true });
+        if (circ) { g.addMod(g.unitAt(p, circ), { power: amount, until: 'turn' }); g.log(g.name(g.unitAt(p, circ).c) + ' +' + fmt(amount) + '.', p); }
+      };
+      switch (d.trigger) {
+        case 'crit': {
+          const circ = yield* this.chooseUnit(p, { title: 'Critical +1: choose a unit', purpose: 'crit', alwaysAsk: true });
+          if (circ) { this.addMod(this.unitAt(p, circ), { crit: 1, until: 'turn' }); this.log(this.name(this.unitAt(p, circ).c) + ' critical +1.', p); }
+          yield* pw(this, 10000); return true;
+        }
+        case 'draw': this.draw(p, 1); yield* pw(this, 10000); return true;
+        case 'front':
+          for (const f of FRONT) { const u = this.unitAt(p, f); if (u) this.addMod(u, { power: 10000, until: 'turn' }); }
+          this.log('Front row +10000.', p); return true;
+        case 'heal': {
+          yield* pw(this, 10000);
+          if (pl.damage.length > 0 && pl.damage.length >= this.P(o).damage.length) {
+            let idx = pl.damage.findIndex(x => !x.faceUp); if (idx < 0) idx = pl.damage.length - 1;
+            const h = pl.damage.splice(idx, 1)[0]; pl.drop.push(h.c); this.log('Heals 1 damage!', p);
+          }
+          return true;
+        }
+        case 'over': {
+          if (pl.trig.includes(c)) this.take(pl.trig, c);
+          pl.removed.push(c); this.log('OVER TRIGGER! ' + d.name + ' is removed from the game.', p);
+          this.draw(p, 1);
+          yield* pw(this, 100000000, '+100 million: choose a unit');
+          if (mode === 'drive' && d.overExtra) { this.log('Additional effect of ' + d.name + '!', p); yield* d.overExtra(this, { p }); }
+          return false;
+        }
+      }
+      return true;
+    }
+
+    /* ---------- snapshot for UI / network ---------- */
+    snapshot() {
+      const u = x => x && ({ id: x.c.id, iid: x.c.iid, rested: x.rested, od: x.od, under: x.under.map(c => c.id), faceDown: !!x.faceDown });
+      return {
+        turn: this.turn, active: this.active, phase: this.phase, winner: this.winner, reason: this.reason, over: this.over,
+        players: this.players.map((pl, i) => ({
+          hand: pl.hand.map(c => ({ id: c.id, iid: c.iid })), deck: pl.deck.length, ride: pl.rideDeck.map(c => c.id), drop: pl.drop.map(c => c.id), soul: pl.soul.map(c => c.id),
+          damage: pl.damage.map(d => ({ id: d.c.id, faceUp: d.faceUp })), removed: pl.removed.map(c => c.id), trig: pl.trig.map(c => c.id), gc: pl.gc.map(g => ({ id: g.c.id, shield: this.gcShield(g) })),
+          circles: Object.fromEntries(CIRCS.map(c => [c, u(this.unitAt(i, c))])),
+          power: Object.fromEntries(CIRCS.map(c => [c, this.power(i, c)])), crit: Object.fromEntries(CIRCS.map(c => [c, this.crit(i, c)])),
+          persona: this.tf.persona[i]
+        })),
+        battle: this.battle && { ap: this.battle.ap, tp: this.battle.tp, a: this.circOf(this.battle.ap, this.battle.aUnit), t: this.circOf(this.battle.tp, this.battle.tUnit), b: this.battle.bUnit && this.circOf(this.battle.ap, this.battle.bUnit), atk: this.attackPower(), def: this.defensePower() }
+      };
+    }
+    totalCards(p) {
+      const pl = this.P(p);
+      let n = pl.deck.length + pl.rideDeck.length + pl.hand.length + pl.drop.length + pl.damage.length + pl.soul.length + pl.removed.length + pl.gc.length + pl.trig.length;
+      for (const c of CIRCS) { const u = this.unitAt(p, c); if (u) n += 1 + u.under.length; }
+      return n;
+    }
+  }
+
+  function fmt(n) { return n >= 100000000 ? (n / 1000000).toLocaleString('en-US') + 'M' : n.toLocaleString('en-US'); }
+
+  /* ---------- deck validation (Standard) ---------- */
+  function validateDeck(db, deck) {
+    const errs = []; const all = deck.ride.concat(deck.main);
+    if (deck.ride.length !== 4) errs.push('The ride deck needs 4 cards (grades 0, 1, 2 and 3).');
+    else { const gs = deck.ride.map(id => db[id] && db[id].grade).sort().join(','); if (gs !== '0,1,2,3') errs.push('The ride deck needs exactly one grade 0, 1, 2 and 3.'); }
+    if (all.length !== 50) errs.push('The deck has ' + all.length + ' cards; it needs exactly 50 (ride deck included).');
+    const trig = all.filter(id => db[id].trigger).length; if (trig !== 16) errs.push(trig + ' triggers; it needs exactly 16.');
+    const heal = all.filter(id => db[id].trigger === 'heal').length; if (heal > 4) errs.push('Max 4 heal triggers (has ' + heal + ').');
+    const over = all.filter(id => db[id].trigger === 'over').length; if (over > 1) errs.push('Max 1 over trigger (has ' + over + ').');
+    const sent = all.filter(id => db[id].sentinel).length; if (sent > 4) errs.push('Max 4 sentinels (has ' + sent + ').');
+    const byName = {}; for (const id of all) byName[db[id].name] = (byName[db[id].name] || 0) + 1;
+    for (const n in byName) if (byName[n] > 4) errs.push('Max 4 copies of "' + n + '" (has ' + byName[n] + ').');
+    const nations = new Set(all.map(id => db[id].nation).filter(n => n));
+    if (nations.size > 1) errs.push('Use one nation only (plus nationless cards): ' + [...nations].join(', ') + '.');
+    return errs;
+  }
+
+  const api = { Game, GameOver, validateDeck, RCS, CIRCS, FRONT, BEHIND, CIRC_PT, TRIG_PT, fmt };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.VGEngine = api;
+})(this);
+
+;
+/* Heuristic bot. decide(game, prompt) -> answer valid for that prompt. */
+(function (root) {
+  'use strict';
+  const FRONT = ['VC', 'FL', 'FR'];
+
+  function cardValue(g, p, c) {
+    const d = g.def(c); const pl = g.P(p);
+    if (d.trigger === 'over') return 12;
+    if (d.sentinel) return 10;
+    if (d.trigger === 'heal') return 8;
+    if (d.trigger === 'crit' || d.trigger === 'front') return 7;
+    if (d.trigger === 'draw') return 5;
+    if (d.grade === 3) {
+      const vc = pl.vc && g.def(pl.vc.c);
+      const copies = pl.hand.filter(x => g.def(x).name === d.name).length;
+      if (vc && d.name === vc.name && copies <= 1) return 9; // keep for persona ride
+      if (d.name === 'Grand Heavenly Sword, Alden' || d.name === 'Knight of War Damage, Fosado') return 6;
+      return 3;
+    }
+    if (d.overDress) return 7;
+    if (d.name === 'Trickstar') return 6;
+    if (d.type === 'order') return 4;
+    if (d.grade === 2) return 4;
+    return 3;
+  }
+  const lowest = (g, p, cards) => cards.slice().sort((a, b) => cardValue(g, p, a) - cardValue(g, p, b));
+  const cardOf = (g, iid) => { for (const pl of g.players) for (const z of ['hand', 'deck', 'drop', 'soul', 'rideDeck']) { const c = pl[z].find(x => x.iid === iid); if (c) return c; } return null; };
+
+  function decide(g, pr) {
+    const p = pr.player;
+    switch (pr.type) {
+      case 'mulligan': {
+        const pl = g.P(p); const back = [];
+        const g3 = pl.hand.filter(c => g.def(c).grade === 3);
+        g3.slice(1).forEach(c => back.push('c' + c.iid));
+        return back;
+      }
+      case 'ride': {
+        const persona = pr.options.find(o => o.persona); if (persona) return persona.key;
+        const rd = pr.options.find(o => o.kind === 'rideDeck'); if (rd) return rd.key;
+        const vg = g.vgGrade(p);
+        const up = pr.options.find(o => o.kind === 'hand' && g.db[o.id].grade === vg + 1); if (up) return up.key;
+        return 'skip';
+      }
+      case 'main': return mainMove(g, p, pr.actions);
+      case 'attack': return attackMove(g, p, pr.actions);
+      case 'guard': return guardMove(g, p, pr);
+      case 'yesno': return yesno(g, p, pr);
+      case 'select': return select(g, p, pr);
+    }
+    return null;
+  }
+
+  function mainMove(g, p, acts) {
+    const pl = g.P(p); const o = 1 - p;
+    const by = k => acts.filter(a => a.kind === k);
+    // Nirvana ACT: bring back Trickstar when there is an empty front circle
+    for (const a of by('act')) {
+      const d = g.db[a.id];
+      if (d.name === 'Chakrabarthi Divine Dragon, Nirvana') {
+        const tricks = pl.drop.some(c => g.def(c).name === 'Trickstar');
+        const hasOD = pl.hand.some(c => g.def(c).overDress);
+        const empty = ['FL', 'FR'].some(c => !pl.rc[c]);
+        if (tricks && hasOD && empty && pl.hand.length >= 2) return a.key;
+      }
+    }
+    // overDress
+    const ods = by('od').filter(a => ['FL', 'FR'].includes(a.circ));
+    if (ods.length) {
+      const arcs = ods.find(a => g.db[a.id].name === 'Vairina Arcs' && g.faceUpDamage(p) >= 1);
+      return (arcs || ods[0]).key;
+    }
+    // order: Sunburst Evolution
+    for (const a of by('order')) {
+      const d = g.db[a.id];
+      if (d.name === 'Sunburst Evolution' && pl.drop.some(c => g.def(c).name === 'Vairina') && g.faceUpDamage(p) >= 2) return a.key;
+    }
+    // calls into empty circles
+    const keepHand = g.vgGrade(p) >= 3 ? 3 : 4;
+    if (pl.hand.length > keepHand || (g.vgGrade(p) >= 3 && g.P(o).damage.length >= 4 && pl.hand.length > 2)) {
+      const calls = by('call').filter(a => !g.unitAt(p, a.circ));
+      const cand = calls.filter(a => { const d = g.db[a.id]; return !d.sentinel && !(d.trigger && d.trigger !== null && d.grade === 0 && d.name !== 'Trickstar' && !['BL', 'BC', 'BR'].includes(a.circ)); });
+      const score = a => {
+        const d = g.db[a.id]; const front = ['FL', 'FR'].includes(a.circ);
+        if (d.trigger) return front ? -99 : (d.trigger === 'heal' || d.trigger === 'over' ? -99 : -5);
+        if (d.name === 'Trickstar') return front && pl.hand.some(c => g.def(c).overDress) ? 30 : (front ? -10 : 5);
+        if (d.name === 'Grand Heavenly Sword, Alden') return g.canPay(p, { cb: 2, sb: 1 }) ? (front ? 40 : 15) : (front ? 22 : 8);
+        if (front) return d.grade >= 2 ? 20 + d.grade : -10;
+        return d.skill === 'boost' ? 12 + d.grade : 0;
+      };
+      const best = cand.map(a => [score(a), a]).filter(x => x[0] > 0).sort((a, b) => b[0] - a[0])[0];
+      if (best) return best[1].key;
+    }
+    // move: put an attacker in front if front is empty and back has a non-booster
+    for (const a of by('move')) {
+      const [f, b] = a.col === 'L' ? ['FL', 'BL'] : ['FR', 'BR'];
+      const fu = pl.rc[f], bu = pl.rc[b];
+      if (!fu && bu && g.def(bu.c).grade >= 2) return a.key;
+      if (fu && bu && g.def(fu.c).skill === 'boost' && g.def(bu.c).grade >= 2 && g.def(fu.c).grade < 2) return a.key;
+    }
+    return 'end';
+  }
+
+  function attackMove(g, p, acts) {
+    const atks = acts.filter(a => a.kind === 'attack');
+    if (!atks.length) return 'end';
+    const vc = atks.find(a => a.a === 'VC' && a.t === 'VC'); if (vc) return vc.key;
+    const toVC = atks.filter(a => a.t === 'VC');
+    if (toVC.length) {
+      // attack with the strongest column first
+      const scored = toVC.map(a => [g.power(p, a.a), a]).sort((x, y) => y[0] - x[0]);
+      if (scored[0][0] > 0) return scored[0][1].key;
+    }
+    return atks[0].key;
+  }
+
+  function guardMove(g, p, pr) {
+    const atk = pr.atk, def = pr.def; const b = g.battle; const pl = g.P(p);
+    if (def > atk && !needsMargin(g, p)) return 'done';
+    const targetVC = b.targetIsVC; const dmg = pl.damage.length;
+    const vcAtk = g.circOf(b.ap, b.aUnit) === 'VC';
+    if (b.tUnit.noHit) return 'done';
+    let want = false;
+    if (targetVC) want = dmg + pr.crit >= 6 || dmg >= 3 || pr.crit >= 2 || (dmg >= 2 && pl.hand.length >= 6);
+    else want = !!b.tUnit.od && pl.hand.length >= 5;
+    if (!want) return 'done';
+    const margin = targetVC && vcAtk && dmg >= 4 ? 10000 : 0;
+    const need = atk + margin - def;
+    if (need < 0) return 'done';
+    const opts = pr.actions.filter(a => a.kind !== 'done');
+    const sentinel = opts.find(a => a.kind === 'guard' && g.db[a.id].sentinel);
+    const canSent = sentinel && pl.hand.length >= 2 && !pl.gc.some(x => g.def(x.c).sentinel);
+    if (canSent && targetVC && (need >= 20000 || dmg + pr.crit >= 6 && need >= 10000)) return sentinel.key;
+    const inter = opts.filter(a => a.kind === 'intercept');
+    if (inter.length) return inter[0].key;
+    const guards = opts.filter(a => a.kind === 'guard' && a.shield > 0 && !g.db[a.id].sentinel && g.db[a.id].trigger !== 'over')
+      .map(a => [a, cardValue(g, p, cardOf(g, a.iid)) / (a.shield / 5000)]).sort((x, y) => x[1] - y[1]);
+    // if total available shield cannot stop it, don't waste cards unless lethal
+    const avail = guards.reduce((s, x) => s + x[0].shield, 0);
+    if (avail <= need && !(dmg + pr.crit >= 6)) return 'done';
+    if (guards.length) {
+      // pick the smallest single card that covers the gap, else cheapest
+      const cover = guards.filter(x => x[0].shield > need).sort((x, y) => x[0].shield - y[0].shield || x[1] - y[1])[0];
+      return (cover || guards[0])[0].key;
+    }
+    const over = opts.find(a => a.kind === 'guard' && g.db[a.id].trigger === 'over');
+    if (over && dmg + pr.crit >= 6) return over.key;
+    if (canSent && targetVC && dmg + pr.crit >= 6) return sentinel.key;
+    return 'done';
+  }
+  function needsMargin(g, p) {
+    const b = g.battle; return b.targetIsVC && g.circOf(b.ap, b.aUnit) === 'VC' && g.P(p).damage.length >= 4 && g.defensePower() - g.attackPower() < 10000;
+  }
+
+  function yesno(g, p, pr) {
+    if (pr.purpose === 'boost') return true;
+    return true;
+  }
+
+  function select(g, p, pr) {
+    const items = pr.items; const min = pr.min, max = pr.max;
+    const pick = arr => arr.slice(0, Math.max(min, Math.min(max, arr.length))).map(i => i.key);
+    const unitScore = fn => items.map(i => [fn(i), i]).sort((a, b) => b[0] - a[0]).map(x => x[1]);
+    switch (pr.purpose) {
+      case 'discard': case 'soulblast': {
+        const cards = items.map(i => cardOf(g, i.iid)).filter(Boolean);
+        const order = pr.purpose === 'soulblast'
+          ? cards.sort((a, b) => (g.def(a).name === 'Trickstar' ? -1 : 0) - (g.def(b).name === 'Trickstar' ? -1 : 0))
+          : lowest(g, p, cards);
+        return order.slice(0, min).map(c => 'c' + c.iid);
+      }
+      case 'reveal': return pick(items);
+      case 'power': case 'crit': {
+        const b = g.battle;
+        if (b && b.ap === p) {
+          const ac = g.circOf(p, b.aUnit);
+          const attackerKey = p + ':' + ac;
+          const hitting = g.attackPower() >= g.defensePower();
+          if (pr.purpose === 'crit' && ac === 'VC' && hitting && b.targetIsVC && items.some(i => i.key === attackerKey)) return [attackerKey];
+          if (!hitting && items.some(i => i.key === attackerKey)) return [attackerKey];
+          const standing = items.filter(i => FRONT.includes(i.circ) && !g.unitAt(p, i.circ).rested && g.power(p, i.circ) < 100000000);
+          if (standing.length) return [unitScore(i => g.power(p, i.circ)).filter(i => standing.includes(i))[0].key];
+          return [items.find(i => i.circ === 'VC') ? p + ':VC' : items[0].key];
+        }
+        const vcKey = items.find(i => i.circ === 'VC'); return [(vcKey || items[0]).key];
+      }
+      case 'retire': return [unitScore(i => g.power(i.owner, i.circ) + (g.unitAt(i.owner, i.circ).od ? 20000 : 0))[0].key];
+      case 'sentinel': {
+        const b = g.battle; const tc = b && g.circOf(b.tp, b.tUnit);
+        const k = p + ':' + tc; return [items.some(i => i.key === k) ? k : items[0].key];
+      }
+      case 'stand': {
+        const rested = items.filter(i => g.unitAt(p, i.circ).rested);
+        const front = rested.filter(i => ['FL', 'FR'].includes(i.circ));
+        const pool = front.length ? front : rested.length ? rested : items;
+        return [pool.map(i => [g.power(p, i.circ), i]).sort((a, b) => b[0] - a[0])[0][1].key];
+      }
+      case 'circle': {
+        const d = pr.card ? g.db[pr.card] : null; const pl = g.P(p);
+        const empty = items.filter(i => !pl.rc[i.circ]);
+        const front = d && (d.grade >= 2 || d.name === 'Trickstar');
+        const prefer = front ? ['FL', 'FR', 'BL', 'BR', 'BC'] : ['BC', 'BL', 'BR', 'FL', 'FR'];
+        for (const c of prefer) { const it = empty.find(i => i.circ === c); if (it) return [it.key]; }
+        const weakest = items.map(i => [pl.rc[i.circ] ? cardValue(g, p, pl.rc[i.circ].c) : 0, i]).sort((a, b) => a[0] - b[0])[0][1];
+        return [weakest.key];
+      }
+      case 'callFromHand': {
+        const cards = items.map(i => cardOf(g, i.iid));
+        const best = cards.filter(c => !g.def(c).sentinel && !g.def(c).trigger).sort((a, b) => g.def(b).grade - g.def(a).grade)[0] || cards[0];
+        return ['c' + best.iid];
+      }
+      case 'callFromDrop': case 'fromDrop': case 'search': {
+        const t = items.find(i => g.db[i.id].name === 'Trickstar'); return pick(t ? [t].concat(items.filter(i => i !== t)) : items);
+      }
+      case 'mulligan': return [];
+    }
+    return pick(items);
+  }
+
+  const api = { decide, cardValue };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.VGAI = api;
+})(this);
+
+;
+/* Card image pack: match user-supplied image files to card ids and keep them in IndexedDB. */
+(function (root) {
+  'use strict';
+  const EXT = /\.(png|jpe?g|webp|gif|avif)$/i;
+
+  function normName(s) { return String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ''); }
+
+  /* Returns a card id such as "D-BT01/001" or null. cards = {id: {name,set,no}} */
+  function matchFile(fileName, cards, nameIndex) {
+    const base = String(fileName).split(/[\\/]/).pop().replace(EXT, '');
+    // set + number: dbt01_001, D-BT01-001EN, D-BT01_001, DZ-TD04 009, dsd01-004
+    const m = base.match(/(?:^|[^A-Za-z])(DZ|D)[-_ ]?([A-Za-z]{2,4})[-_ ]?(\d{2})[-_ /]+(\d{3})(?!\d)/i) ||
+              base.match(/^(DZ|D)[-_ ]?([A-Za-z]{2,4})(\d{2})[-_ ]?(\d{3})(?!\d)/i);
+    if (m) {
+      const id = m[1].toUpperCase() + '-' + m[2].toUpperCase() + m[3] + '/' + m[4];
+      if (cards[id]) return id;
+    }
+    // card name: "Vairina Arcs.png", "vairina-arcs.jpg"
+    const n = normName(base.replace(/[-_ ]?(EN|JP|PT)$/i, ''));
+    if (nameIndex && nameIndex[n]) return nameIndex[n];
+    return null;
+  }
+  function buildNameIndex(cards) {
+    const idx = {}; const seen = {};
+    for (const id in cards) { const k = normName(cards[id].name); seen[k] = (seen[k] || 0) + 1; idx[k] = id; }
+    for (const k in seen) if (seen[k] > 1) delete idx[k]; // ambiguous names need set/number
+    return idx;
+  }
+
+  /* ---------- IndexedDB (falls back to memory when unavailable) ---------- */
+  const DB = 'dv-images', STORE = 'img';
+  let dbp = null; const mem = new Map();
+  function open() {
+    if (dbp) return dbp;
+    dbp = new Promise(resolve => {
+      try {
+        const rq = indexedDB.open(DB, 1);
+        rq.onupgradeneeded = () => rq.result.createObjectStore(STORE);
+        rq.onsuccess = () => resolve(rq.result);
+        rq.onerror = () => resolve(null);
+        rq.onblocked = () => resolve(null);
+      } catch (e) { resolve(null); }
+    });
+    return dbp;
+  }
+  async function putAll(entries) { // [[id, blob]]
+    for (const [id, b] of entries) mem.set(id, b);
+    const db = await open(); if (!db) return false;
+    return new Promise(res => {
+      try {
+        const tx = db.transaction(STORE, 'readwrite'); const st = tx.objectStore(STORE);
+        for (const [id, b] of entries) st.put(b, id);
+        tx.oncomplete = () => res(true); tx.onerror = () => res(false); tx.onabort = () => res(false);
+      } catch (e) { res(false); }
+    });
+  }
+  async function loadAll() {
+    const db = await open(); if (!db) return new Map(mem);
+    return new Promise(res => {
+      try {
+        const out = new Map(mem); const tx = db.transaction(STORE, 'readonly'); const st = tx.objectStore(STORE);
+        const rq = st.openCursor();
+        rq.onsuccess = () => { const c = rq.result; if (c) { out.set(c.key, c.value); c.continue(); } else res(out); };
+        rq.onerror = () => res(out);
+      } catch (e) { res(new Map(mem)); }
+    });
+  }
+  async function clearAll() {
+    mem.clear(); const db = await open(); if (!db) return;
+    await new Promise(res => { try { const tx = db.transaction(STORE, 'readwrite'); tx.objectStore(STORE).clear(); tx.oncomplete = res; tx.onerror = res; } catch (e) { res(); } });
+  }
+
+  /* files: File[] (images or .zip). Returns {matched:[[id,blob,fileName]], unmatched:[names]} */
+  async function readFiles(files, cards) {
+    const nameIndex = buildNameIndex(cards);
+    const matched = [], unmatched = [];
+    const consider = (name, blob) => {
+      if (!EXT.test(name)) return;
+      const id = matchFile(name, cards, nameIndex);
+      if (id) matched.push([id, blob, name]); else unmatched.push(name);
+    };
+    for (const f of files) {
+      if (/\.zip$/i.test(f.name)) {
+        if (!root.JSZip) throw new Error('The .zip reader could not load. Unzip the file and choose the folder instead.');
+        const zip = await root.JSZip.loadAsync(f);
+        const jobs = [];
+        zip.forEach((path, entry) => {
+          if (entry.dir || !EXT.test(path) || /(^|\/)__MACOSX\//.test(path)) return;
+          jobs.push(entry.async('blob').then(b => {
+            const ext = path.match(EXT)[1].toLowerCase();
+            const type = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'image/' + ext;
+            consider(path, b.type ? b : new Blob([b], { type }));
+          }));
+        });
+        await Promise.all(jobs);
+      } else consider(f.webkitRelativePath || f.name, f);
+    }
+    // keep the last file seen for each card
+    const byId = new Map(); for (const m of matched) byId.set(m[0], m);
+    return { matched: [...byId.values()], unmatched };
+  }
+
+  const api = { matchFile, buildNameIndex, normName, putAll, loadAll, clearAll, readFiles };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.VGImages = api;
+})(this);
+
+;
+(function () {
+  'use strict';
+  const { Game, validateDeck, CIRC_PT, fmt, FRONT, TRIG_PT } = VGEngine;
+  const { CARDS, DECKS } = VGCards;
+  const AI = VGAI;
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('dv:' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem('dv:' + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } }
+  };
+  const OFFICIAL_IMG = 'https://en.cf-vanguard.com/wordpress/wp-content/images/cardlist/{setl}/{setl}_{no}.png';
+  const settings = Object.assign({ img: OFFICIAL_IMG, autoBoost: true, speed: 'normal' }, store.get('settings2', {}));
+  const saveSettings = () => store.set('settings2', settings);
+  const NAT = { 'Dragon Empire': 'DE', 'Keter Sanctuary': 'KS' };
+  const H = 0; // human seat
+
+  /* ---------------- decks ---------------- */
+  function fromPrebuilt(key) {
+    const d = DECKS[key]; const total = Object.assign({}, d.counts);
+    for (const id of d.ride) total[id] = (total[id] || 0) + 1;
+    return { id: 'pre-' + key, name: d.name, ride: d.ride.slice(), total, pre: true };
+  }
+  function toPlayable(d) {
+    const main = [];
+    for (const id in d.total) { const n = d.total[id] - (d.ride.includes(id) ? 1 : 0); for (let i = 0; i < n; i++) main.push(id); }
+    return { ride: d.ride.slice(), main };
+  }
+  function deckErrors(d) {
+    const errs = [];
+    for (const id of d.ride) if (!d.total[id]) errs.push('Ride deck card is not in the deck: ' + CARDS[id].name);
+    return errs.length ? errs : validateDeck(CARDS, toPlayable(d));
+  }
+  const prebuilt = () => Object.keys(DECKS).map(fromPrebuilt);
+  const savedDecks = () => store.get('decks', []);
+  const allDecks = () => prebuilt().concat(savedDecks());
+  const deckById = id => allDecks().find(d => d.id === id);
+
+  /* ---------------- card render ---------------- */
+  const packUrl = {}; // card id -> blob: URL from the imported image pack
+  function imgUrl(d) {
+    if (packUrl[d.id]) return packUrl[d.id];
+    if (!settings.img) return '';
+    return fillTpl(settings.img, d);
+  }
+  function fillTpl(tpl, d) {
+    return tpl.replace(/\{set\}/g, d.set).replace(/\{setl\}/g, d.set.toLowerCase().replace(/-/g, '')).replace(/\{no\}/g, d.no).replace(/\{id\}/g, d.id);
+  }
+  function glyph(name) { const w = name.split(/[ ,]+/).filter(Boolean); return (w[w.length - 1] || '?').slice(0, 2).toUpperCase(); }
+  function cardHTML(id, o) {
+    o = o || {};
+    if (!id) return '<div class="card back"></div>';
+    const d = CARDS[id]; const n = NAT[d.nation] || 'NN';
+    const tag = d.trigger ? '<span class="tg ' + d.trigger + '">' + TRIG_PT[d.trigger] + '</span>' : d.sentinel ? '<span class="tg sent">Sentinel</span>' : d.type === 'order' ? '<span class="tg ord">Order</span>' : '';
+    const url = imgUrl(d);
+    let alt = '';
+    if (url && !packUrl[d.id] && settings.img === OFFICIAL_IMG) alt = fillTpl(OFFICIAL_IMG.replace('.png', 'en.png'), d);
+    const img = url ? '<img class="scan" src="' + esc(url) + '"' + (alt ? ' data-alt="' + esc(alt) + '"' : '') + ' alt="' + esc(d.name) + '" loading="lazy" referrerpolicy="no-referrer" onload="this.classList.add(\'ok\')" onerror="dvImgFail(this)">' : '';
+    const pw = d.type === 'order' ? '' : '<div class="pw"><span>' + (d.power / 1000) + 'k</span>' + (d.crit > 1 ? '<span>★' + d.crit + '</span>' : '') + '</div>';
+    const sh = d.type === 'order' || !d.shield ? '' : '<span class="sh">' + (d.shield / 1000) + 'k</span>';
+    return '<div class="card n-' + n + '" title="' + esc(d.name) + '"><span class="gr">' + d.grade + '</span>' + tag +
+      '<div class="art"><span class="glyph">' + esc(glyph(d.name)) + '</span></div>' + sh +
+      '<div class="nm">' + esc(d.name) + pw + '</div>' + img + '</div>';
+  }
+
+  window.dvImgFail = img => { const a = img.dataset.alt; if (a) { img.removeAttribute('data-alt'); img.src = a; } else img.remove(); };
+  /* ---------------- views / nav ---------------- */
+  const views = { play: 'view-home', decks: 'view-decks', cards: 'view-cards', ranking: 'view-rank' };
+  function route() {
+    let v = (location.hash || '#play').slice(1); if (!views[v]) v = 'play';
+    for (const k in views) $('#' + views[k]).hidden = k !== v;
+    document.querySelectorAll('.nav button').forEach(b => b.setAttribute('aria-current', b.dataset.v === v ? 'page' : 'false'));
+    if (v === 'play') renderHome(); if (v === 'decks') renderBuilder(); if (v === 'cards') renderCards(); if (v === 'ranking') renderRank();
+  }
+  window.addEventListener('hashchange', route);
+  document.querySelectorAll('.nav button').forEach(b => b.addEventListener('click', () => { location.hash = b.dataset.v; }));
+
+  /* ---------------- home ---------------- */
+  function renderHome() {
+    const ds = allDecks();
+    const valid = ds.filter(d => !deckErrors(d).length);
+    const sel = store.get('lastDeck', valid[0] && valid[0].id);
+    $('#my-deck').innerHTML = valid.map(d => '<option value="' + esc(d.id) + '"' + (d.id === sel ? ' selected' : '') + '>' + esc(d.name) + (d.pre ? ' · prebuilt' : '') + '</option>').join('');
+    $('#bot-deck').innerHTML = '<option value="random">Random</option>' + prebuilt().map(d => '<option value="' + d.id + '">' + esc(d.name) + '</option>').join('');
+    $('#bot-speed').value = settings.speed; $('#auto-boost').checked = settings.autoBoost; $('#img-tpl').value = settings.img;
+    const r = store.get('rating', { r: 1000, w: 0, l: 0 });
+    $('#home-rating').textContent = Math.round(r.r) + ' pts · ' + r.w + 'W ' + r.l + 'L';
+    $('#fan').innerHTML = ['D-SD01/001', 'D-SD03/001', 'D-SD01/010'].map((id, i) => '<div class="card-slot" style="position:absolute;width:118px;left:calc(50% - 59px + ' + ((i - 1) * 70) + 'px);top:' + (i === 1 ? 0 : 18) + 'px;transform:rotate(' + ((i - 1) * 9) + 'deg)">' + cardHTML(id) + '</div>').join('');
+  }
+  $('#bot-speed').addEventListener('change', e => { settings.speed = e.target.value; saveSettings(); });
+  $('#auto-boost').addEventListener('change', e => { settings.autoBoost = e.target.checked; saveSettings(); });
+  $('#img-tpl').addEventListener('change', e => { settings.img = e.target.value.trim(); saveSettings(); toast(settings.img ? 'Image source saved.' : 'Using generated frames.'); });
+  $('#img-official').addEventListener('click', () => { settings.img = OFFICIAL_IMG; $('#img-tpl').value = OFFICIAL_IMG; saveSettings(); toast('Official card list images enabled.'); });
+  $('#play-bot').addEventListener('click', () => {
+    const mine = deckById($('#my-deck').value); if (!mine) { toast('Choose a valid deck.'); return; }
+    store.set('lastDeck', mine.id);
+    let bv = $('#bot-deck').value; const pre = prebuilt();
+    const bot = bv === 'random' ? pre[Math.floor(Math.random() * pre.length)] : pre.find(d => d.id === bv);
+    startGame(mine, bot);
+  });
+
+  /* ---------------- game controller ---------------- */
+  let G = null, botTimer = null, ui = { sel: null }, meta = null;
+  function startGame(mine, bot) {
+    G = new Game(CARDS, [toPlayable(mine), toPlayable(bot)], { names: ['You', 'Bot'] });
+    meta = { mine: mine.name, bot: bot.name, done: false };
+    ui = { sel: null };
+    $('#game').hidden = false; document.body.style.overflow = 'hidden';
+    G.start(); pump();
+  }
+  function leaveGame() {
+    clearTimeout(botTimer); G = null; $('#game').hidden = true; $('#result').hidden = true; closeSheet(); document.body.style.overflow = ''; route();
+  }
+  $('#g-quit').addEventListener('click', () => {
+    if (!G || G.over) return leaveGame();
+    openSheet('<h3>Concede this match?</h3><p class="muted">It counts as a loss in your local ranking.</p><div class="row"><button class="btn danger" id="q-yes">Concede</button><button class="btn" id="q-no">Keep playing</button></div>');
+    $('#q-yes').onclick = () => { closeSheet(); finish(true); }; $('#q-no').onclick = closeSheet;
+  });
+  $('#g-log').addEventListener('click', () => {
+    openSheet('<h3>Match log</h3><div class="logp" style="display:block;width:auto;border:0;max-height:60vh">' + logHTML(200) + '</div><button class="btn" id="lg-x">Close</button>');
+    $('#lg-x').onclick = closeSheet;
+  });
+  const delay = () => settings.speed === 'fast' ? 120 : settings.speed === 'slow' ? 900 : 450;
+
+  function pump() {
+    clearTimeout(botTimer);
+    if (!G) return;
+    render();
+    if (G.over) { finish(false); return; }
+    const pr = G.prompt; if (!pr) return;
+    if (pr.player !== H) { botTimer = setTimeout(() => { if (!G || G.prompt !== pr) return; G.answer(AI.decide(G, pr)); pump(); }, delay()); return; }
+    human(pr);
+  }
+  function answer(v) { ui.sel = null; closeSheet(); G.answer(v); pump(); }
+
+  function human(pr) {
+    if (pr.type === 'yesno') {
+      if (pr.purpose === 'boost' && settings.autoBoost) { setTimeout(() => answer(true), 0); return; }
+      openSheet((pr.id ? '<div style="width:90px">' + cardHTML(pr.id) + '</div>' : '') + '<h3>' + esc(pr.title) + '</h3>' + (pr.cost ? '<p class="muted">Cost: ' + esc(pr.cost) + '</p>' : '') +
+        '<div class="row"><button class="btn primary" id="yn-y">Yes</button><button class="btn" id="yn-n">No</button></div>', true);
+      $('#yn-y').onclick = () => answer(true); $('#yn-n').onclick = () => answer(false);
+      return;
+    }
+    if (pr.type === 'ride') {
+      openSheet('<h3>Ride Phase</h3><p class="muted">Current vanguard: ' + esc(G.name(G.P(H).vc.c)) + ' (grade ' + G.vgGrade(H) + ')</p><div class="optlist">' +
+        pr.options.map(o => '<button class="btn' + (o.kind === 'rideDeck' || o.persona ? ' primary' : '') + '" data-k="' + esc(o.key) + '">' + esc(o.label) + '</button>').join('') + '</div>', true);
+      document.querySelectorAll('#sheet [data-k]').forEach(b => b.onclick = () => answer(b.dataset.k));
+      return;
+    }
+    if (pr.type === 'select' || pr.type === 'mulligan') { selectSheet(pr); return; }
+    closeSheet();
+  }
+
+  function selectSheet(pr) {
+    const picked = new Set();
+    const tile = it => {
+      let id = it.id;
+      return '<button data-k="' + esc(it.key) + '" aria-pressed="false"><div>' + cardHTML(id) + '</div><span>' + esc(it.circ ? CIRC_PT[it.circ] + (it.owner !== H ? ' (opponent)' : '') : '') + '</span></button>';
+    };
+    const range = pr.min === pr.max ? String(pr.min) : pr.min + ' to ' + pr.max;
+    openSheet('<h3>' + esc(pr.title) + '</h3><p class="muted">Select ' + range + '.</p><div class="pick">' + pr.items.map(tile).join('') + '</div>' +
+      '<div class="row"><button class="btn primary" id="sel-ok">Confirm</button>' + (pr.min === 0 ? '<button class="btn" id="sel-none">None</button>' : '') + '<button class="btn small" id="sel-peek">View board</button></div>', true);
+    const ok = $('#sel-ok');
+    const upd = () => { ok.disabled = picked.size < pr.min || picked.size > pr.max; };
+    upd();
+    document.querySelectorAll('#sheet .pick button').forEach(b => b.onclick = () => {
+      const k = b.dataset.k;
+      if (pr.max === 1 && pr.min === 1) { answer([k]); return; }
+      if (picked.has(k)) picked.delete(k); else { if (pr.max === 1) { picked.clear(); document.querySelectorAll('#sheet .pick button').forEach(x => x.setAttribute('aria-pressed', 'false')); } if (picked.size < pr.max) picked.add(k); }
+      b.setAttribute('aria-pressed', picked.has(k) ? 'true' : 'false'); upd();
+    });
+    ok.onclick = () => answer([...picked]);
+    if ($('#sel-none')) $('#sel-none').onclick = () => answer([]);
+    $('#sel-peek').onclick = () => { $('#sheet').hidden = true; toast('Tap "Choose" to go back.'); render(); };
+  }
+
+  /* ---------------- board render ---------------- */
+  const MY = [['FL', 'VC', 'FR'], ['BL', 'BC', 'BR']];
+  const OPP = [['BR', 'BC', 'BL'], ['FR', 'VC', 'FL']];
+  function unitHTML(p, c) {
+    const u = G.unitAt(p, c);
+    const cls = ['circ']; if (c === 'VC') cls.push('vc');
+    const hl = highlight(p, c); if (hl) cls.push(hl);
+    const b = G.battle;
+    if (b && u && b.aUnit === u) cls.push('attacking');
+    if (b && u && b.tUnit === u) cls.push('defending');
+    if (u && u.rested) cls.push('rested');
+    let inner = c === 'VC' ? 'VC' : 'RC';
+    if (u) {
+      const pw = G.power(p, c); const base = G.def(u.c).power;
+      const cr = G.crit(p, c);
+      inner = (u.faceDown ? cardHTML(null) : cardHTML(u.c.id)) +
+        (u.faceDown ? '' : '<span class="badge pw' + (pw > base ? ' up' : '') + '">' + fmt(pw) + '</span>') +
+        (cr > 1 ? '<span class="badge cr">★' + cr + '</span>' : '') + (u.od ? '<span class="badge od">OD</span>' : '');
+    }
+    return '<div class="' + cls.join(' ') + '" data-p="' + p + '" data-c="' + c + '" role="button" tabindex="0" aria-label="' + esc((u ? G.name(u.c) : 'empty') + ' ' + CIRC_PT[c]) + '">' + inner + '</div>';
+  }
+  function zonesHTML(p) {
+    const pl = G.P(p);
+    const z = (k, l, n) => '<button class="zone" data-z="' + k + '" data-p="' + p + '"><span>' + l + '</span><b>' + n + '</b></button>';
+    return '<div class="zones">' + z('deck', 'Deck', pl.deck.length) + z('drop', 'Drop', pl.drop.length) + z('soul', 'Soul', pl.soul.length) + z('ride', 'Ride', pl.rideDeck.length) + (p !== H ? '<div class="zone"><span>Hand</span><b>' + pl.hand.length + '</b></div>' : '') + '</div>';
+  }
+  function dmgHTML(p) {
+    const d = G.P(p).damage; let s = '<button class="dmg zone" data-z="damage" data-p="' + p + '" aria-label="Damage: ' + d.length + '" style="justify-content:center">';
+    for (let i = 0; i < 6; i++) s += '<i class="' + (i < d.length ? (d[i].faceUp ? 'up' : 'down') : 'empty') + '"></i>';
+    return s + '</button>';
+  }
+  function fieldHTML(p, rows) { return '<div class="fieldgrid">' + rows.flat().map(c => unitHTML(p, c)).join('') + '</div>'; }
+  function highlight(p, c) {
+    const pr = G.prompt; if (!pr || pr.player !== H) return '';
+    const s = ui.sel;
+    if (s && s.unit && s.unit === c && p === H) return 'sel';
+    if (pr.type === 'main' && s && s.hand) {
+      if (p === H && pr.actions.some(a => (a.kind === 'call' || a.kind === 'od') && a.iid === s.hand && a.circ === c)) return 'can';
+    }
+    if (pr.type === 'attack') {
+      if (s && s.unit && p !== H && pr.actions.some(a => a.kind === 'attack' && a.a === s.unit && a.t === c)) return 'target';
+      if (!s && p === H && pr.actions.some(a => a.kind === 'attack' && a.a === c)) return 'can';
+    }
+    if (pr.type === 'guard' && p === H && pr.actions.some(a => a.kind === 'intercept' && a.circ === c)) return 'can';
+    return '';
+  }
+  function logHTML(n) {
+    return G.logs.slice(-n).reverse().map(l => '<p class="' + (l.p < 0 ? 'sys' : 'p' + l.p) + '">' + esc(l.t) + '</p>').join('');
+  }
+  const PHASE = { setup: 'Setup', stand: 'Stand', draw: 'Draw', ride: 'Ride', main: 'Main', battle: 'Battle', end: 'End', over: 'Game over' };
+
+  function render() {
+    if (!G) return;
+    const pr = G.prompt; const mine = pr && pr.player === H;
+    $('#g-phase').textContent = 'Turn ' + G.turn + ' · ' + PHASE[G.phase];
+    $('#g-who').textContent = G.over ? '' : (G.active === H ? 'Your turn' : 'Bot\'s turn');
+    $('#opp-hand').innerHTML = G.P(1).hand.map(() => '<div style="width:22px">' + cardHTML(null) + '</div>').join('');
+    $('#opp-side').innerHTML = '<div>' + fieldHTML(1, OPP) + '</div>' + '<div class="stack" style="gap:6px">' + zonesHTML(1) + dmgHTML(1) + '</div>';
+    $('#me-side').innerHTML = '<div>' + fieldHTML(H, MY) + '</div>' + '<div class="stack" style="gap:6px">' + dmgHTML(H) + zonesHTML(H) + '</div>';
+    // middle
+    let mid = '';
+    if (G.battle) {
+      const atk = G.attackPower(), df = G.defensePower();
+      mid = '<span class="vs"><span class="a">⚔ ' + fmt(atk) + '</span> × <span class="d">🛡 ' + fmt(df) + '</span></span>';
+      const gp = G.battle.tp; const gc = G.P(gp).gc;
+      if (gc.length) mid += '<span class="gc">' + gc.map(x => '<div class="card-mini">' + cardHTML(x.c.id) + '</div>').join('') + '</span>';
+      if (G.P(G.battle.tp).trig.length || G.P(G.battle.ap).trig.length) mid += '<span class="gc">' + G.P(0).trig.concat(G.P(1).trig).map(c => cardHTML(c.id)).join('') + '</span>';
+    } else if (G.P(0).trig.length || G.P(1).trig.length) {
+      mid = '<span class="gc">' + G.P(0).trig.concat(G.P(1).trig).map(c => cardHTML(c.id)).join('') + '</span>';
+    } else if (G.tf.persona[G.active]) mid = '<span class="chip">Persona Ride active: front row +10k</span>';
+    $('#mid').innerHTML = mid;
+    // hand
+    const hand = G.P(H).hand;
+    $('#hand').innerHTML = hand.map(c => {
+      const usable = mine && handUsable(pr, c.iid);
+      return '<button class="hc' + (ui.sel && ui.sel.hand === c.iid ? ' sel' : '') + (mine && (pr.type === 'main' || pr.type === 'guard') && !usable ? ' dim' : '') + '" data-iid="' + c.iid + '" aria-label="' + esc(G.name(c)) + '">' + cardHTML(c.id) + '</button>';
+    }).join('');
+    $('#logp').innerHTML = logHTML(80);
+    renderDetail(); renderActionbar();
+  }
+  function handUsable(pr, iid) {
+    if (pr.type === 'main') return pr.actions.some(a => a.iid === iid);
+    if (pr.type === 'guard') return pr.actions.some(a => a.iid === iid);
+    return false;
+  }
+
+  function renderDetail() {
+    const el = $('#detail'); const s = ui.sel; const pr = G.prompt;
+    if (!s) { el.hidden = true; return; }
+    let id = null, extra = '';
+    if (s.hand) { const c = G.P(H).hand.find(x => x.iid === s.hand); if (!c) { ui.sel = null; el.hidden = true; return; } id = c.id; }
+    if (s.unit || s.view) { const u = G.unitAt(s.p == null ? H : s.p, s.unit || s.view); if (!u) { ui.sel = null; el.hidden = true; return; } id = u.c.id; if (u.under.length) extra = '<p class="muted">originalDress: ' + u.under.map(c => esc(G.name(c))).join(', ') + '</p>'; }
+    if (s.card) id = s.card;
+    const d = CARDS[id];
+    let acts = [];
+    if (pr && pr.player === H) {
+      if (pr.type === 'main' && s.hand) {
+        for (const a of pr.actions.filter(a => a.iid === s.hand)) {
+          if (a.kind === 'order') acts.push(['Play order', a.key, 'primary']);
+          if (a.kind === 'od') acts.push(['overDress → ' + CIRC_PT[a.circ], a.key, 'primary']);
+        }
+        if (pr.actions.some(a => a.kind === 'call' && a.iid === s.hand)) extra += '<p class="muted">Tap a highlighted circle to call.</p>';
+      }
+      if (pr.type === 'main' && s.unit) {
+        for (const a of pr.actions.filter(a => a.kind === 'act' && a.circ === s.unit)) acts.push([a.label, a.key, 'primary']);
+        const col = { FL: 'L', BL: 'L', FR: 'R', BR: 'R' }[s.unit];
+        const mv = pr.actions.find(a => a.kind === 'move' && a.col === col); if (mv) acts.push(['Move in column', mv.key, '']);
+      }
+      if (pr.type === 'attack' && s.unit) {
+        const vcA = pr.actions.find(a => a.kind === 'attack' && a.a === s.unit && a.t === 'VC');
+        if (vcA) acts.push(['Attack the vanguard', vcA.key, 'primary']);
+        if (pr.actions.some(a => a.kind === 'attack' && a.a === s.unit && a.t !== 'VC')) extra += '<p class="muted">Or tap an opponent rear-guard marked in red.</p>';
+      }
+      if (pr.type === 'guard' && s.hand) { const a = pr.actions.find(x => x.iid === s.hand); if (a) acts.push(['Guard (+' + fmt(a.shield) + ')', a.key, 'primary']); }
+      if (pr.type === 'guard' && s.unit) { const a = pr.actions.find(x => x.kind === 'intercept' && x.circ === s.unit); if (a) acts.push(['Intercept (+' + fmt(a.shield) + ')', a.key, 'primary']); }
+    }
+    const stats = d.type === 'order' ? 'Order · grade ' + d.grade : 'Grade ' + d.grade + ' · ' + fmt(d.power) + ' power · ' + fmt(d.shield) + ' shield' + (d.skill ? ' · ' + ({ boost: 'Boost', intercept: 'Intercept', twin: 'Twin Drive', triple: 'Triple Drive' })[d.skill] : '');
+    el.innerHTML = '<div>' + cardHTML(id) + '</div><div class="txt"><b>' + esc(d.name) + '</b><div class="muted" style="font-size:12px">' + esc(stats) + ' · ' + esc(d.set + '/' + d.no) + (d.verified ? '' : ' · summarized text') + '</div>' +
+      '<div>' + esc(d.text) + '</div>' + extra + '<div class="acts">' + acts.map(a => '<button class="btn small ' + a[2] + '" data-k="' + esc(a[1]) + '">' + esc(a[0]) + '</button>').join('') + '<button class="btn small" id="d-x">Close</button></div></div>';
+    el.hidden = false;
+    el.querySelectorAll('[data-k]').forEach(b => b.onclick = () => answer(b.dataset.k));
+    $('#d-x').onclick = () => { ui.sel = null; render(); };
+  }
+
+  function renderActionbar() {
+    const el = $('#actionbar'); const pr = G.prompt;
+    let hint = '', btns = [];
+    if (!pr || G.over) { el.innerHTML = '<span class="hint">Match over.</span>'; return; }
+    if (pr.player !== H) {
+      const last = G.logs[G.logs.length - 1];
+      el.innerHTML = '<span class="hint">Bot is thinking… ' + esc(last ? last.t : '') + '</span>'; return;
+    }
+    if ($('#sheet').hidden && (pr.type === 'select' || pr.type === 'mulligan' || pr.type === 'yesno' || pr.type === 'ride')) {
+      btns.push(['Choose', 'reopen', 'primary']); hint = pr.title;
+    } else if (pr.type === 'main') {
+      hint = 'Main Phase: tap a card in hand to call it, or a unit for its abilities.';
+      btns.push(['Go to battle', 'end', 'primary']);
+    } else if (pr.type === 'attack') {
+      hint = ui.sel && ui.sel.unit ? 'Choose the attack target.' : 'Tap a standing front row unit to attack.';
+      if (ui.sel) btns.push(['Cancel', 'cancel', '']);
+      btns.push(['End turn', 'end', 'primary']);
+    } else if (pr.type === 'guard') {
+      const gap = pr.atk - pr.def;
+      const need = gap >= 0 ? (Math.floor(gap / 5000) + 1) * 5000 : 0;
+      hint = 'Guard: ⚔ ' + fmt(pr.atk) + ' × 🛡 ' + fmt(pr.def) + (need ? ' — ' + fmt(need) + ' more shield needed to block.' : ' — attack blocked (before drive checks).');
+      btns.push(['Confirm guard', 'done', 'primary']);
+    }
+    el.innerHTML = '<span class="hint">' + esc(hint) + '</span>' + btns.map(b => '<button class="btn ' + b[2] + '" data-k="' + b[1] + '">' + esc(b[0]) + '</button>').join('');
+    el.querySelectorAll('[data-k]').forEach(b => b.onclick = () => {
+      const k = b.dataset.k;
+      if (k === 'reopen') { human(pr); return; }
+      if (k === 'cancel') { ui.sel = null; render(); return; }
+      answer(k);
+    });
+  }
+
+  /* board clicks */
+  $('#game').addEventListener('click', e => {
+    if (!G) return;
+    const z = e.target.closest('[data-z]');
+    if (z) { showZone(+z.dataset.p, z.dataset.z); return; }
+    const hc = e.target.closest('.hc');
+    const ci = e.target.closest('.circ');
+    const pr = G.prompt; const mine = pr && pr.player === H && $('#sheet').hidden;
+    if (hc) {
+      const iid = +hc.dataset.iid;
+      ui.sel = ui.sel && ui.sel.hand === iid ? null : { hand: iid };
+      render(); return;
+    }
+    if (ci) {
+      const p = +ci.dataset.p, c = ci.dataset.c; const u = G.unitAt(p, c);
+      if (mine && pr.type === 'main' && ui.sel && ui.sel.hand && p === H) {
+        const od = pr.actions.find(a => a.kind === 'od' && a.iid === ui.sel.hand && a.circ === c);
+        const call = pr.actions.find(a => a.kind === 'call' && a.iid === ui.sel.hand && a.circ === c);
+        if (od) return answer(od.key);
+        if (call) return answer(call.key);
+      }
+      if (mine && pr.type === 'attack') {
+        if (ui.sel && ui.sel.unit && p !== H) { const a = pr.actions.find(x => x.kind === 'attack' && x.a === ui.sel.unit && x.t === c); if (a) return answer(a.key); }
+        if (p === H && pr.actions.some(a => a.kind === 'attack' && a.a === c)) { ui.sel = { unit: c, p: H }; render(); return; }
+      }
+      if (u && !u.faceDown) { ui.sel = p === H ? { unit: c, p } : { view: c, p }; render(); }
+      return;
+    }
+  });
+  $('#game').addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('circ')) { e.preventDefault(); e.target.click(); } });
+
+  function showZone(p, z) {
+    const pl = G.P(p); let cards = []; let title = '';
+    if (z === 'deck') { openSheet('<h3>Deck</h3><p class="muted">' + pl.deck.length + ' cards left (order hidden).</p><button class="btn" id="zx">Close</button>'); $('#zx').onclick = closeSheet; return; }
+    if (z === 'drop') { cards = pl.drop.map(c => c.id); title = 'Drop'; }
+    if (z === 'soul') { cards = pl.soul.map(c => c.id); title = 'Soul'; }
+    if (z === 'ride') { cards = p === H ? pl.rideDeck.map(c => c.id) : pl.rideDeck.map(() => null); title = 'Ride Deck'; }
+    if (z === 'damage') { cards = pl.damage.map(d => d.c.id); title = 'Damage (' + pl.damage.filter(d => d.faceUp).length + ' available for Counter Blast)'; }
+    openSheet('<h3>' + esc(title) + ' · ' + (p === H ? 'you' : 'bot') + '</h3>' + (cards.length ? '<div class="pick">' + cards.map(id => '<div>' + cardHTML(id) + '</div>').join('') + '</div>' : '<p class="muted">Empty.</p>') + '<button class="btn" id="zx">Close</button>');
+    $('#zx').onclick = () => { closeSheet(); if (G && G.prompt && G.prompt.player === H && ['select', 'mulligan', 'yesno', 'ride'].includes(G.prompt.type)) human(G.prompt); };
+  }
+
+  /* sheet & toast */
+  function openSheet(html, blocking) {
+    const s = $('#sheet'); s.innerHTML = '<div class="box" role="dialog" aria-modal="true">' + html + '</div>'; s.hidden = false; s.dataset.blocking = blocking ? '1' : '';
+  }
+  function closeSheet() { const s = $('#sheet'); s.hidden = true; s.innerHTML = ''; }
+  $('#sheet').addEventListener('click', e => { if (e.target.id === 'sheet' && !$('#sheet').dataset.blocking) closeSheet(); else if (e.target.id === 'sheet') { $('#sheet').hidden = true; render(); } });
+  let toastT = null;
+  function toast(t) { const el = $('#toast'); el.textContent = t; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, 2200); }
+
+  /* result + rating */
+  function finish(resigned) {
+    if (!G || meta.done) return;
+    meta.done = true; clearTimeout(botTimer);
+    const win = !resigned && G.winner === H; const draw = !resigned && G.winner < 0;
+    const r = store.get('rating', { r: 1000, w: 0, l: 0 }); const hist = store.get('history', []);
+    const bot = 1000; const exp = 1 / (1 + Math.pow(10, (bot - r.r) / 400)); const score = win ? 1 : draw ? 0.5 : 0;
+    const delta = Math.round(32 * (score - exp));
+    r.r += delta; if (win) r.w++; else if (!draw) r.l++;
+    store.set('rating', r);
+    hist.unshift({ t: Date.now(), mine: meta.mine, bot: meta.bot, res: win ? 'V' : draw ? 'E' : 'D', turns: G.turn, delta, reason: resigned ? 'conceded' : G.reason });
+    store.set('history', hist.slice(0, 50));
+    render();
+    $('#result').innerHTML = '<div class="box"><h2 class="' + (win ? 'win' : 'lose') + '">' + (win ? 'Victory!' : draw ? 'Draw' : 'Defeat') + '</h2><p class="muted">' + esc(resigned ? 'You conceded.' : (G.reason || '')) + ' · ' + G.turn + ' turns</p>' +
+      '<p><b>' + (delta >= 0 ? '+' : '') + delta + '</b> pts · rating ' + Math.round(r.r) + '</p><div class="row" style="justify-content:center"><button class="btn primary" id="r-again">Play again</button><button class="btn" id="r-menu">Menu</button></div></div>';
+    $('#result').hidden = false;
+    $('#r-again').onclick = () => { $('#result').hidden = true; const m = allDecks().find(d => d.name === meta.mine) || prebuilt()[0]; const b = prebuilt().find(d => d.name === meta.bot) || prebuilt()[1]; startGame(m, b); };
+    $('#r-menu').onclick = leaveGame;
+  }
+
+  /* ---------------- ranking ---------------- */
+  function renderRank() {
+    const r = store.get('rating', { r: 1000, w: 0, l: 0 }); const h = store.get('history', []);
+    $('#rank-sum').innerHTML = '<div class="row"><span class="logo" style="font-size:34px">' + Math.round(r.r) + '</span><span class="chip">' + r.w + ' wins</span><span class="chip">' + r.l + ' losses</span></div>';
+    $('#rank-hist').innerHTML = h.length ? '<div style="overflow-x:auto"><table class="rank"><thead><tr><th>Date</th><th>Result</th><th>Your deck</th><th>Bot</th><th>Turns</th><th>Pts</th></tr></thead><tbody>' +
+      h.map(x => '<tr><td>' + new Date(x.t).toLocaleDateString('en-US') + '</td><td>' + (x.res === 'V' ? '<span class="ok">Win</span>' : x.res === 'E' ? 'Draw' : 'Loss') + '</td><td>' + esc(x.mine) + '</td><td>' + esc(x.bot) + '</td><td>' + x.turns + '</td><td>' + (x.delta >= 0 ? '+' : '') + x.delta + '</td></tr>').join('') + '</tbody></table></div>'
+      : '<p class="muted">No matches yet. Play the bot to start your history.</p>';
+  }
+
+  /* ---------------- card gallery ---------------- */
+  let cardFilter = 'all';
+  function poolCards(filter, q) {
+    return Object.values(CARDS).filter(d => (filter === 'all' || (NAT[d.nation] || 'NN') === filter) && (!q || d.name.toLowerCase().includes(q.toLowerCase())))
+      .sort((a, b) => a.grade - b.grade || a.name.localeCompare(b.name));
+  }
+  function renderCards() {
+    const list = poolCards(cardFilter, $('#cards-q').value);
+    $('#cards-grid').innerHTML = list.map(d => '<div class="it" style="display:grid;grid-template-columns:96px minmax(0,1fr);gap:10px;align-items:start"><div>' + cardHTML(d.id) + '</div><div style="min-width:0"><b>' + esc(d.name) + '</b><div class="muted" style="font-size:12px">' + esc(d.set + '/' + d.no) + ' · ' + esc(d.nation || 'Nationless') + ' · Grade ' + d.grade + (d.verified ? '' : ' · <span title="Taken from the official guide summary; check against the printed text">summarized text</span>') + '</div><p style="white-space:pre-line;margin:6px 0 0;font-size:13px">' + esc(d.text) + '</p></div></div>').join('');
+    document.querySelectorAll('#cards-filter button').forEach(b => b.setAttribute('aria-pressed', b.dataset.f === cardFilter ? 'true' : 'false'));
+  }
+  document.querySelectorAll('#cards-filter button').forEach(b => b.addEventListener('click', () => { cardFilter = b.dataset.f; renderCards(); }));
+  $('#cards-q').addEventListener('input', renderCards);
+
+  /* ---------------- deck builder ---------------- */
+  let edit = null, bFilter = 'all';
+  function newDeck() { return { id: 'u' + Date.now(), name: 'My deck', ride: [], total: {} }; }
+  function renderBuilder() {
+    if (!edit) { const saved = savedDecks(); edit = saved[0] ? JSON.parse(JSON.stringify(saved[0])) : Object.assign(fromPrebuilt('nirvana'), { id: 'u' + Date.now(), name: 'Nirvana (copy)', pre: false }); }
+    const ds = savedDecks();
+    $('#b-load').innerHTML = '<option value="">Load…</option>' + ds.map(d => '<option value="' + esc(d.id) + '">' + esc(d.name) + '</option>').join('') + prebuilt().map(d => '<option value="' + d.id + '">Prebuilt: ' + esc(d.name) + '</option>').join('');
+    $('#b-name').value = edit.name;
+    const q = $('#b-q').value;
+    $('#b-pool').innerHTML = poolCards(bFilter, q).map(d => {
+      const n = edit.total[d.id] || 0; const inRide = edit.ride.includes(d.id);
+      const canRide = d.type === 'unit' && d.grade <= 3;
+      return '<div class="it"><div data-info="' + d.id + '">' + cardHTML(d.id) + '</div><div class="qty"><button data-m="' + d.id + '" aria-label="Remove ' + esc(d.name) + '">−</button><b>' + n + '</b><button data-a="' + d.id + '" aria-label="Add ' + esc(d.name) + '">+</button></div>' +
+        (canRide ? '<button class="btn small' + (inRide ? ' primary' : '') + '" data-r="' + d.id + '">' + (inRide ? '★ Ride' : 'Ride') + '</button>' : '') + '</div>';
+    }).join('');
+    document.querySelectorAll('#b-filter button').forEach(b => b.setAttribute('aria-pressed', b.dataset.f === bFilter ? 'true' : 'false'));
+    // deck side
+    const ids = Object.keys(edit.total).filter(id => edit.total[id] > 0).sort((a, b) => CARDS[a].grade - CARDS[b].grade || CARDS[a].name.localeCompare(CARDS[b].name));
+    const total = ids.reduce((s, id) => s + edit.total[id], 0);
+    const trig = ids.reduce((s, id) => s + (CARDS[id].trigger ? edit.total[id] : 0), 0);
+    const byG = [0, 1, 2, 3].map(g => ids.reduce((s, id) => s + (CARDS[id].grade === g ? edit.total[id] : 0), 0));
+    $('#b-sum').innerHTML = '<span class="chip">' + total + '/50 cards</span><span class="chip">' + trig + '/16 triggers</span>' + byG.map((n, g) => '<span class="chip">G' + g + ': ' + n + '</span>').join('');
+    const rideSorted = edit.ride.slice().sort((a, b) => CARDS[a].grade - CARDS[b].grade);
+    $('#b-ride').innerHTML = [0, 1, 2, 3].map(g => { const id = rideSorted.find(x => CARDS[x].grade === g); return '<div style="width:64px;font-size:8px">' + (id ? cardHTML(id) : '<div class="circ" style="max-height:none">G' + g + '</div>') + '</div>'; }).join('');
+    $('#b-list').innerHTML = ids.map(id => '<div class="ln"><b>' + edit.total[id] + '×</b><span class="chip">G' + CARDS[id].grade + '</span><span>' + esc(CARDS[id].name) + '</span><span class="muted">' + (CARDS[id].trigger ? TRIG_PT[CARDS[id].trigger] : '') + '</span></div>').join('') || '<p class="muted">Empty deck. Add cards with the "+" buttons.</p>';
+    const errs = deckErrors(edit);
+    $('#b-errs').innerHTML = errs.length ? errs.map(e => '<div>• ' + esc(e) + '</div>').join('') : '<div class="ok">Deck is legal for Standard.</div>';
+  }
+  $('#b-pool').addEventListener('click', e => {
+    const a = e.target.closest('[data-a]'), m = e.target.closest('[data-m]'), r = e.target.closest('[data-r]'), inf = e.target.closest('[data-info]');
+    if (a) { const id = a.dataset.a; edit.total[id] = Math.min(4, (edit.total[id] || 0) + 1); }
+    else if (m) { const id = m.dataset.m; edit.total[id] = Math.max(0, (edit.total[id] || 0) - 1); if (!edit.total[id]) { delete edit.total[id]; edit.ride = edit.ride.filter(x => x !== id); } }
+    else if (r) {
+      const id = r.dataset.r; const g = CARDS[id].grade;
+      if (edit.ride.includes(id)) edit.ride = edit.ride.filter(x => x !== id);
+      else { edit.ride = edit.ride.filter(x => CARDS[x].grade !== g); edit.ride.push(id); if (!edit.total[id]) edit.total[id] = 1; }
+    } else if (inf) { const d = CARDS[inf.dataset.info]; openSheet('<div style="display:grid;grid-template-columns:110px minmax(0,1fr);gap:12px"><div>' + cardHTML(d.id) + '</div><div><h3>' + esc(d.name) + '</h3><p class="muted">' + esc(d.set + '/' + d.no) + '</p><p style="white-space:pre-line">' + esc(d.text) + '</p></div></div><button class="btn" id="ix">Close</button>'); $('#ix').onclick = closeSheet; return; }
+    else return;
+    renderBuilder();
+  });
+  document.querySelectorAll('#b-filter button').forEach(b => b.addEventListener('click', () => { bFilter = b.dataset.f; renderBuilder(); }));
+  $('#b-q').addEventListener('input', renderBuilder);
+  $('#b-name').addEventListener('input', e => { edit.name = e.target.value; });
+  $('#b-new').addEventListener('click', () => { edit = newDeck(); renderBuilder(); });
+  $('#b-load').addEventListener('change', e => {
+    const v = e.target.value; if (!v) return;
+    const d = deckById(v); edit = JSON.parse(JSON.stringify(d));
+    if (d.pre) { edit.id = 'u' + Date.now(); edit.name = d.name + ' (copy)'; edit.pre = false; }
+    renderBuilder();
+  });
+  $('#b-save').addEventListener('click', () => {
+    const ds = savedDecks(); const i = ds.findIndex(d => d.id === edit.id);
+    edit.name = edit.name.trim() || 'My deck';
+    if (i >= 0) ds[i] = edit; else ds.unshift(edit);
+    store.set('decks', ds); toast(deckErrors(edit).length ? 'Saved (not legal to play yet).' : 'Deck saved and ready to play.'); renderBuilder();
+  });
+  $('#b-del').addEventListener('click', () => {
+    const ds = savedDecks().filter(d => d.id !== edit.id); store.set('decks', ds); edit = null; toast('Deck deleted.'); renderBuilder();
+  });
+
+  /* ---------------- image pack ---------------- */
+  async function refreshPack() {
+    const map = await VGImages.loadAll();
+    for (const k in packUrl) { try { URL.revokeObjectURL(packUrl[k]); } catch (e) { /* ignore */ } delete packUrl[k]; }
+    for (const [id, blob] of map) if (CARDS[id]) packUrl[id] = URL.createObjectURL(blob);
+    packStatus();
+    if (G) render(); else route();
+  }
+  function packStatus(extra) {
+    const ids = Object.keys(CARDS); const have = ids.filter(id => packUrl[id]);
+    const missing = ids.filter(id => !packUrl[id]).sort();
+    $('#img-status').innerHTML = (extra ? esc(extra) + '<br>' : '') + '<b>' + have.length + ' of ' + ids.length + '</b> cards have an image.' +
+      (missing.length ? '<details style="margin-top:4px"><summary>Show cards without an image</summary><div style="font-size:12px;columns:2;margin-top:4px">' +
+        missing.map(id => esc(id.replace('/', '_').toLowerCase().replace(/^(dz|d)-/, '$1')) + ' · ' + esc(CARDS[id].name)).join('<br>') + '</div></details>' : '');
+  }
+  async function importFiles(list) {
+    const files = [...list]; if (!files.length) return;
+    $('#img-status').textContent = 'Reading ' + files.length + ' file(s)…';
+    try {
+      const r = await VGImages.readFiles(files, CARDS);
+      const ok = await VGImages.putAll(r.matched.map(m => [m[0], m[1]]));
+      await refreshPack();
+      const msg = r.matched.length + ' image(s) matched to cards' + (r.unmatched.length ? ', ' + r.unmatched.length + ' skipped (name not recognized: ' + r.unmatched.slice(0, 3).join(', ') + (r.unmatched.length > 3 ? '…' : '') + ')' : '') + '.' + (ok ? '' : ' This browser blocked storage, so images last only until you close the page.');
+      packStatus(msg); toast(r.matched.length + ' images imported.');
+    } catch (e) { $('#img-status').textContent = e.message; }
+  }
+  $('#img-files').addEventListener('change', e => { importFiles(e.target.files); e.target.value = ''; });
+  $('#img-dir').addEventListener('change', e => { importFiles(e.target.files); e.target.value = ''; });
+  $('#img-clear').addEventListener('click', async () => { await VGImages.clearAll(); await refreshPack(); toast('Images removed.'); });
+  const dz = $('#img-drop');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('over'); importFiles(e.dataTransfer.files); });
+  refreshPack();
+
+  window.__dv = { get game() { return G; }, answer: v => answer(v) };
+  route();
+})();
+</script>
+</body>
+</html>
