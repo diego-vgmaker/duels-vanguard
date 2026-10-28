@@ -938,6 +938,12 @@ details summary { cursor: pointer; color: var(--ink); }
       }
     });
 
+    add['107'] = ORD('107', 'Hopeful Testode', KS, 3, 'blitz', {
+      text: 'Blitz Order. If you have three or more units, choose one of your units; it gets +15000 until end of that battle.',
+      canPlay: (g, x) => !!g.battle && g.units(x.p).length >= 3,
+      play: function* (g, x) { if (g.units(x.p).length >= 3) yield* g.buff(x.p, { power: 15000, until: 'battle', purpose: 'defend' }); }
+    });
+
     /* ======================= Stoicheia ======================= */
     add['009'] = U('009', 'Mysterious Rain Spiritualist, Zorga', ST, 3, {
       race: 'Ghost',
@@ -1096,7 +1102,7 @@ details summary { cursor: pointer; color: var(--ink); }
     DECKS.orfist = deck('Orfist (Brandt Gate)', ['087', '084', '039', '005'],
       { '005': 3, '082': 1, '040': 4, '041': 3, '039': 2, '018': 4, '085': 2, '086': 2, '042': 4, '043': 2, '094': 2, '092': 1, '088': 4, '089': 4, '090': 4, '091': 4 });
     DECKS.hexaorb = deck('Hexaorb (Keter Sanctuary)', ['101', '099', '046', '008'],
-      { '008': 3, '096': 3, '097': 2, '098': 4, '045': 2, '047': 3, '048': 3, '100': 2, '021': 2, '049': 4, '106': 2, '102': 4, '103': 4, '104': 4, '105': 4 });
+      { '008': 3, '096': 3, '097': 2, '098': 4, '045': 2, '047': 3, '048': 3, '021': 2, '049': 4, '106': 2, '107': 2, '102': 4, '103': 4, '104': 4, '105': 4 });
     DECKS.zorga = deck('Zorga (Stoicheia)', ['113', '111', '050', '009'],
       { '009': 3, '108': 3, '109': 2, '010': 3, '023': 3, '024': 3, '051': 2, '112': 2, '052': 4, '053': 2, '054': 1, '055': 2, '114': 4, '115': 4, '116': 4, '117': 4 });
   }
@@ -2464,7 +2470,7 @@ details summary { cursor: pointer; color: var(--ink); }
     if (blitz.length && targetVC && (dmg >= 3 || dmg + pr.crit >= 6)) {
       const big = blitz.find(a => g.db[a.id].name === 'Lightning Barrier, Emergency Deployment!');
       if (big && need >= 15000) return big.key;
-      const other = blitz.find(a => g.db[a.id].name !== 'Lightning Barrier, Emergency Deployment!' && need <= 15000 && need > 0);
+      const other = blitz.find(a => g.db[a.id].name !== 'Lightning Barrier, Emergency Deployment!' && need <= (g.db[a.id].name === 'Ghost Chase' ? 5000 : 15000) && need > 0);
       if (other) return other.key;
     }
     const multi = opts.find(a => a.kind === 'guardMulti');
