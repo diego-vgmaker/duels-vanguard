@@ -1506,6 +1506,30 @@ details summary { cursor: pointer; color: var(--ink); }
     k['016'] = T14('016', 'Dragon Dancer, Monica', DE, 'draw', 'Human');
     k['017'] = T14('017', 'Dragon Monk, Genjo', DE, 'heal', 'Human');
 
+    k['018'] = {
+      set: S14, no: '018', name: 'Forbidoll Surrogate', nation: null, grade: 3, type: 'order', order: 'normal', regalis: true, power: 0, shield: 0, crit: 0, verified: true,
+      text: 'Regalis Piece (one per deck, used once per fight). Normal Order.\nSearch your deck or drop for up to a total of two grade 3 or 4 unit cards with different card names and reveal them, call all revealed grade 3 cards to (RC), and put all revealed grade 4 cards into your hand. If you searched the deck, shuffle the deck.',
+      noAlchemagic: true,
+      canPlay: (g, x) => !g.P(x.p).perm.regalisUsed,
+      play: function* (g, x) {
+        const pl = g.P(x.p); pl.perm.regalisUsed = true;
+        const ok = c => { const d = g.def(c); return d.type === 'unit' && (d.grade === 3 || d.grade === 4); };
+        const pool = pl.deck.filter(ok).concat(pl.drop.filter(ok));
+        const items = pool.map(c => ({ key: 'c' + c.iid, label: g.name(c) + (pl.drop.includes(c) ? ' (drop)' : ' (deck)'), id: c.id, iid: c.iid }));
+        const ans = yield { type: 'select', player: x.p, title: 'Choose up to two grade 3 or 4 units with different names (deck or drop)', items, min: 0, max: 2, purpose: 'search' };
+        let keys = g._validKeys(ans, items, 0, 2);
+        const picks = []; for (const kk of keys) { const c = pool.find(c => 'c' + c.iid === kk); if (c && !picks.some(p2 => g.name(p2) === g.name(c))) picks.push(c); }
+        let fromDeck = false;
+        for (const c of picks) { if (pl.deck.includes(c)) { fromDeck = true; g.take(pl.deck, c); } else g.take(pl.drop, c); pl.trig.push(c); }
+        if (picks.length) g.log(g.names[x.p] + ' reveals ' + picks.map(c => g.name(c)).join(', ') + '.', x.p);
+        for (const c of picks) {
+          if (g.def(c).grade === 4) { g.take(pl.trig, c); pl.hand.push(c); }
+          else yield* g.callFrom(x.p, c, 'trig', { from: fromDeck ? 'deck' : 'drop' });
+        }
+        if (fromDeck) g.shuffle(pl.deck);
+      }
+    };
+
     for (const [set, list] of [[S13, a], [S14, k]]) for (const no in list) { const id = set + '/' + no; const d = list[no]; d.id = id; CARDS[id] = d; }
 
     const B13 = n => S13 + '/' + n, B14 = n => S14 + '/' + n;
@@ -1513,7 +1537,7 @@ details summary { cursor: pointer; color: var(--ink); }
     DECKS.aichi = deck('Aichi: Blaster Blade (Keter Sanctuary)', B13, ['004', '003', '002', '001'],
       { '001': 2, '006': 3, '002': 3, '007': 4, '008': 3, '009': 4, '010': 2, '011': 4, '012': 4, '018': 1, '014': 4, '015': 4, '016': 4, '017': 3, '013': 1 }, '005');
     DECKS.kai = deck('Kai: Dragonic Overlord (Dragon Empire)', B14, ['004', '003', '002', '001'],
-      { '001': 3, '006': 3, '002': 2, '008': 4, '009': 4, '007': 2, '010': 4, '011': 4, '012': 4, '014': 4, '015': 4, '016': 3, '017': 4, '013': 1 }, '005');
+      { '001': 3, '006': 3, '002': 2, '008': 4, '009': 4, '007': 1, '018': 1, '010': 4, '011': 4, '012': 4, '014': 4, '015': 4, '016': 3, '017': 4, '013': 1 }, '005');
   }
   if (typeof module !== 'undefined' && module.exports) module.exports = install; else root.VGCardsDZSS = install;
 })(this);
@@ -1787,7 +1811,7 @@ details summary { cursor: pointer; color: var(--ink); }
   if (dzss) dzss(CARDS, helpers, DECKS);
   for (const id in CARDS) { CARDS[id].id = id; if (!CARDS[id].abilities) CARDS[id].abilities = []; }
 
-  function expandDeck(d) { const main = []; for (const id in d.counts) for (let i = 0; i < d.counts[id]; i++) main.push(id); return { ride: d.ride.slice(), main, crest: d.crest ? [].concat(d.crest) : [] }; }
+  function expandDeck(d) { const main = []; for (const id in d.counts) for (let i = 0; i < d.counts[id]; i++) main.push(id); return { ride: d.ride.slice(), main, crest: [].concat(d.crest || 'DZ-SS13/005') }; } // current rules: every deck has an Energy Generator
 
   const api = { CARDS, DECKS, expandDeck };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.VGCards = api;
@@ -2943,6 +2967,7 @@ details summary { cursor: pointer; color: var(--ink); }
         case 'Cursed Souls Squirming in Agony': if (g.emptyRC(p).length >= 1 && pl.soul.length >= 3) return a.key; break;
         case 'Grief, Despair, and Rejection': if (fu >= 2 && g.units(p).length >= 4 && g.name(pl.vc.c) === 'Mysterious Rain Spiritualist, Zorga') return a.key; break;
         case 'Spiritual Body Condensation': if (g.emptyRC(p).length >= 1) return a.key; break;
+        case 'Forbidoll Surrogate': if (g.emptyRC(p).length >= 2) return a.key; break;
       }
     }
     // overDress
@@ -3301,9 +3326,8 @@ details summary { cursor: pointer; color: var(--ink); }
     const main = [];
     for (const id in d.total) { const n = d.total[id] - (d.ride.includes(id) ? 1 : 0); for (let i = 0; i < n; i++) main.push(id); }
     // D-format (DZ) decks use an Energy Generator crest; add it automatically when the deck has DZ cards
-    const ids = Object.keys(d.total);
-    const crest = d.crest || (ids.some(id => CARDS[id] && (CARDS[id].icon || /^DZ-/.test(CARDS[id].set))) ? 'DZ-SS13/005' : null);
-    return { ride: d.ride.slice(), main, crest: crest ? [crest] : [] };
+    // current rules: every deck uses an Energy Generator crest
+    return { ride: d.ride.slice(), main, crest: [d.crest || 'DZ-SS13/005'] };
   }
   function deckErrors(d) {
     const errs = [];
