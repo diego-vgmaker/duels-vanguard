@@ -1842,10 +1842,10 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
     });
     add['040'] = U('040', 'Aerial Sage', KS, 1, {
       race: 'Human', verified: false,
-      text: '[CONT](RC): During the battle this unit is boosted, if you have a grade 3 or greater vanguard with "Rezael" in its card name, this unit gets +5000.\n' +
+      text: '[CONT](RC): During the battle this unit boosted, if you have a grade 3 or greater vanguard with "Rezael" in its card name, this unit gets +5000.\n' +
         '[AUTO](RC): When this unit boosts a grade 3 or greater vanguard with "Rezael" in its card name, [COST: discard 1], Counter-Charge 1, and this unit gets +2000 until end of that battle.',
       abilities: [
-        { kind: 'CONT', zones: ['RC'], power: selfPower(5000, (g, x) => rezael(g, x) && g.battle && g.battle.aUnit === x.unit && !!g.battle.bUnit) },
+        { kind: 'CONT', zones: ['RC'], power: selfPower(5000, (g, x) => rezael(g, x) && g.battle && g.battle.bUnit === x.unit) },
         { kind: 'AUTO', on: 'boost', zones: ['RC'], label: 'Counter-Charge 1, this unit +2000', cost: { discard: 1 },
           cond: (g, x) => g.battle && g.battle.aUnit === g.P(x.p).vc && rezael(g, x),
           resolve: function* (g, x) { g.counterCharge(x.p, 1); g.addMod(x.unit, { power: 2000, until: 'battle' }); } }
@@ -2814,27 +2814,53 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
       }
       return out;
     }
-    *fire(ev, ctx) {
-      const list = this._collect(ev, ctx);
-      for (const it of list) {
-        const { p, ab, card, unit } = it;
+    *fire(ev, ctx) { yield* this.fireAll([[ev, ctx]]); }
+    /* resolve everything that triggered at the same moment (e.g. "when this unit attacks" and "when this unit boosts").
+       Each pick is re-checked when it resolves, so an ability whose cost cannot be paid yet waits until the others
+       have resolved (a Counter-Charge can pay for it). The turn player resolves first; when two or more of a player's
+       abilities with a cost or a choice are ready, that player chooses the order. */
+    *fireAll(evs) {
+      const pending = [];
+      for (const [ev, ctx] of evs) for (const it of this._collect(ev, ctx)) pending.push(Object.assign(it, { ev, ctx }));
+      const prep = it => {
+        const { p, ab, card, unit, ev, ctx } = it;
         const key = card.iid + ':' + it.i;
-        if (ab.oncePerTurn && this.tf.used.has(key)) continue;
-        if (ab.divine && this.P(p).divineUsed) continue;
-        if (unit && ev !== 'putOnGC' && ev !== 'intercept' && !this.circOf(p, unit)) continue;
+        if (ab.oncePerTurn && this.tf.used.has(key)) return null;
+        if (ab.divine && this.P(p).divineUsed) return null;
+        if (unit && ev !== 'putOnGC' && ev !== 'intercept' && !this.circOf(p, unit)) return null;
         const x = Object.assign({}, ctx, { p, unit, card, self: card, subject: ctx.card, trigUnit: ctx.unit, circ: unit ? this.circOf(p, unit) : null });
-        if (ab.cond && !ab.cond(this, x)) continue;
+        if (ab.cond && !ab.cond(this, x)) return null;
         let cost = typeof ab.cost === 'function' ? ab.cost(this, x) : ab.cost;
-        if (cost && cost.cb && it.unit && this.circOf(p, it.unit) === 'VC' && this.tf.vgCbDiscount[p] > 0) { cost = Object.assign({}, cost, { cb: Math.max(0, cost.cb - 1) }); x.usedDiscount = true; }
+        if (cost && cost.cb && unit && this.circOf(p, unit) === 'VC' && this.tf.vgCbDiscount[p] > 0) { cost = Object.assign({}, cost, { cb: Math.max(0, cost.cb - 1) }); x.usedDiscount = true; }
+        if ((cost || ab.optional) && !this.canPay(p, cost, null, x)) return null;
+        return { key, x, cost };
+      };
+      for (let guard = 0; guard < 200 && pending.length; guard++) {
+        const ready = [];
+        for (const it of pending) { const r = prep(it); if (r) ready.push({ it, r }); }
+        if (!ready.length) break;
+        const first = ready.find(o => o.it.p === this.active) || ready[0];
+        const mine = ready.filter(o => o.it.p === first.it.p);
+        let pick = first;
+        const choices = mine.filter(o => o.r.cost || o.it.ab.optional);
+        if (choices.length >= 2 && choices.length === mine.length) {
+          const items = mine.map((o, k) => ({ key: 'ab' + k, label: this.name(o.it.card) + ': ' + o.it.ab.label + (o.r.cost ? ' [' + this.costText(o.r.cost) + ']' : '') }));
+          const ans = yield { type: 'select', player: first.it.p, title: 'These abilities happen at the same time: choose which resolves first', items, min: 1, max: 1, purpose: 'abilityOrder' };
+          const k = this._validKeys(ans, items, 1, 1)[0]; pick = mine[+k.slice(2)] || first;
+        }
+        pending.splice(pending.indexOf(pick.it), 1);
+        const { p, ab, card } = pick.it; const { key, x, cost } = pick.r;
         if (cost || ab.optional) {
-          if (!this.canPay(p, cost, null, x)) continue;
-          const ok = yield* this.yesno(p, this.name(card) + ': ' + ab.label, 'ability', { cost: this.costText(cost), id: card.id, ev });
+          const ok = yield* this.yesno(p, this.name(card) + ': ' + ab.label, 'ability', { cost: this.costText(cost), id: card.id, ev: pick.it.ev });
           if (!ok) continue;
           if (ab.oncePerTurn) this.tf.used.add(key);
           if (ab.divine) { this.P(p).divineUsed = true; this.log('DIVINE SKILL! (once per fight)', p); }
           if (x.usedDiscount) this.tf.vgCbDiscount[p]--;
           yield* this.pay(p, cost, null, x);
-        } else if (ab.oncePerTurn) this.tf.used.add(key);
+        } else {
+          if (ab.oncePerTurn) this.tf.used.add(key);
+          if (ab.divine) { this.P(p).divineUsed = true; this.log('DIVINE SKILL! (once per fight)', p); }
+        }
         this.log('⚡ ' + this.name(card) + ': ' + ab.label, p);
         yield* ab.resolve(this, x);
         this.checkRules();
@@ -3175,11 +3201,13 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
         if (ok) { bu.rested = true; this.battle.bUnit = bu; this.log(this.name(bu.c) + ' boosts.', p); }
       }
       if (a === 'VC') this.tf.vcAttacks[p]++;
-      yield* this.fire('attack', {});
-      if (a === 'VC' && this.battle) yield* this.fire('vcAttacks', {});
-      if (this.battle.targetIsVC) yield* this.fire('vcAttacked', {});
-      yield* this.fire('unitAttacked', {});
-      if (this.battle.bUnit) { yield* this.fire('boost', {}); yield* this.fire('boosted', {}); }
+      // attack and boost happen together: their abilities share one resolution window
+      const atkEvs = [['attack', {}]];
+      if (a === 'VC') atkEvs.push(['vcAttacks', {}]);
+      if (this.battle.targetIsVC) atkEvs.push(['vcAttacked', {}]);
+      atkEvs.push(['unitAttacked', {}]);
+      if (this.battle.bUnit) atkEvs.push(['boost', {}], ['boosted', {}]);
+      yield* this.fireAll(atkEvs);
       // guard step
       if (this.circOf(p, aUnit) && this.liveTargets().length) {
         for (let k = 0; k < 60; k++) {
@@ -3268,14 +3296,11 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
         }
         this.battle.hit = anyHit;
         if (anyHit) {
-          yield* this.fire('hit', {});
-          if (this.battle.bUnit) yield* this.fire('boostHit', {});
+          yield* this.fireAll(this.battle.bUnit ? [['hit', {}], ['boostHit', {}]] : [['hit', {}]]);
         }
       }
       // close step
-      yield* this.fire('battleEnd', {});
-      if (this.battle.bUnit) yield* this.fire('boostEnd', {});
-      yield* this.fire('battleEndVC', {});
+      yield* this.fireAll(this.battle.bUnit ? [['battleEnd', {}], ['boostEnd', {}], ['battleEndVC', {}]] : [['battleEnd', {}], ['battleEndVC', {}]]);
       for (const pl of this.players) { for (const g of pl.gc) this.toZone(pl.idx, [g.c], 'drop'); pl.gc = []; }
       for (const u of targets) u.noHit = false;
       this.expire('battle');
@@ -3705,6 +3730,12 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
         const eb = items.find(i => /EB/.test(i.label)); return [(eb && g.P(p).energy >= 6 ? eb : items[0]).key];
       }
       case 'mode': return [items[0].key];
+      case 'abilityOrder': {
+        // resolve abilities that give resources before the ones that spend them
+        const gives = items.find(i => /Counter-Charge|Energy-Charge|Soul-Charge/i.test(i.label));
+        const free = items.find(i => !/\[(CB|EB|SB)/.test(i.label));
+        return [(gives || free || items[0]).key];
+      }
       case 'discardOrder': return items.length ? [items[0].key] : [];
       case 'alchemagic': case 'fromSoul': return [items[0].key];
     }
