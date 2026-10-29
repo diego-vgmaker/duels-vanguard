@@ -4064,6 +4064,46 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
     });
     add['121'] = U('121', FG + ', Bleucrea', LM, 0, { race: 'Human', text: G0TEXT, abilities: [firstVanguardDraw] });
 
+
+    /* ---------- remaining commons (texts from card listings) ---------- */
+    add['091'] = U('091', 'Courteous Supporter', BG, 1, {
+      race: 'Alien',
+      text: '[ACT](RC)[1/turn]: [COST: SB1 & discard a card from your hand], choose an Arena from your drop or a face-up Arena from your damage zone, and put it into your hand. If you chose one from your damage zone, put the top card of your deck into your damage zone.',
+      abilities: [{ kind: 'ACT', zones: ['RC'], oncePerTurn: true, label: 'An Arena to hand', cost: { sb: 1, discard: 1 },
+        cond: (g, x) => g.P(x.p).drop.some(c => g.def(c).arena) || g.P(x.p).damage.some(d => d.faceUp && g.def(d.c).arena),
+        resolve: function* (g, x) {
+          const pl = g.P(x.p); const pool = pl.drop.filter(c => g.def(c).arena).concat(pl.damage.filter(d => d.faceUp && g.def(d.c).arena).map(d => d.c));
+          const cs = yield* g.selectCards(x.p, pool, { title: 'Put an Arena into your hand', min: 1, max: 1, purpose: 'fromDrop' });
+          for (const c of cs) {
+            if (pl.drop.includes(c)) { g.take(pl.drop, c); pl.hand.push(c); }
+            else { const i = pl.damage.findIndex(d => d.c === c); if (i < 0) continue; pl.damage.splice(i, 1); pl.hand.push(c); const top = pl.deck.shift(); if (top) { pl.damage.push({ c: top, faceUp: true }); g.log(g.name(top) + ' is put into the damage zone.', x.p); } }
+            g.log(g.name(c) + ' is put into hand.', x.p);
+          }
+          g.checkRules();
+        } }]
+    });
+    add['092'] = U('092', 'Dowsing Finder', BG, 1, {
+      race: 'Alien',
+      text: '[AUTO](RC): When this unit boosts, [COST: EB2], the boosted unit gets +5000 until end of turn.',
+      abilities: [{ kind: 'AUTO', on: 'boost', zones: ['RC'], label: 'The boosted unit +5000', cost: { eb: 2 },
+        resolve: function* (g, x) { const u = g.battle && g.battle.aUnit; if (u) { g.addMod(u, { power: 5000, until: 'turn' }); g.log(g.name(u.c) + ' +5000.', x.p); } } }]
+    });
+    add['101'] = U('101', 'Academic of Ingathering, Harvestein', KS, 1, {
+      race: 'Human',
+      text: '[AUTO]: When this unit is placed on (RC), if you have a grade 3 or greater vanguard with "Solrairon" in its card name, choose up to one grade 2 or less normal unit other than a sentinel from your drop, and put it on the top of your deck or into your soul.',
+      abilities: [{ kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'A unit from the drop to the top of the deck or the soul', cond: (g, x) => vgNamed(g, x.p, 'Solrairon'),
+        resolve: function* (g, x) {
+          const pl = g.P(x.p); const cs = yield* g.selectCards(x.p, pl.drop.filter(c => isNormalUnit(g, c) && g.def(c).grade <= 2 && !g.def(c).sentinel), { title: 'Choose up to one grade 2 or less unit from your drop', min: 0, max: 1, purpose: 'fromDrop' });
+          for (const c of cs) { const k = yield* pickOne(g, x.p, 'Put ' + g.name(c) + ' where?', [{ key: 'top', label: 'Top of the deck' }, { key: 'soul', label: 'Into the soul' }]); g.take(pl.drop, c); if (k === 'top') pl.deck.unshift(c); else pl.soul.push(c); }
+        } }]
+    });
+    add['120'] = U('120', 'Fluffy Arcticwear, Rekky', LM, 1, {
+      race: 'Mermaid',
+      text: '[AUTO]: When this unit is put on (GC) from your hand, if you have one or fewer rear-guards, it gets shield +10000 until end of that battle.',
+      abilities: [{ kind: 'AUTO', on: 'putOnGC', zones: ['GC'], label: 'Shield +10000', cond: (g, x) => g.rearguards(x.p).length <= 1,
+        resolve: function* (g, x) { x.unit.mods.push({ shield: 10000, until: 'battle' }); g.log(g.name(x.card) + ' shield +10000.', x.p); } }]
+    });
+
     for (const no in add) if (add[no]) CARDS[S + '/' + no] = add[no];
 
     const deck = (name, ride, counts) => {
@@ -6687,6 +6727,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
       if (n === 'Dragon Knight, Nehalem' && g.turn > 2) return a.key;
       if ((n === 'Stealth Dragon, Kizanreiji' || n === 'Strong Fortress Dragon, Gibrabrachio') && g.rearguards(o).length >= 1) return a.key;
       if (n === 'Bizarre Beast, Bagumotor') return a.key;
+      if (n === 'Courteous Supporter' && pl.hand.length >= 3 && pl.orderZone.filter(x => g.def(x).arena).length < 3) return a.key;
       if (n === 'Diabolos Edge, Grantory' && g.rearguards(o).some(r => ['FL', 'FR'].includes(r.circ))) return a.key;
       if (n === 'Steam Knight, Pashatatal' && g.turn > 2 && pl.soul.length <= 4) return a.key;
       if (n === 'Ravenous Mutant, Marunorm' && fu < 3) return a.key;
