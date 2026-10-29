@@ -5072,6 +5072,354 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
   }
   if (typeof module !== 'undefined' && module.exports) module.exports = install; else root.VGCardsDBT02 = install;
 })(this);
+;
+/* DZ-SS09 "Zero Tendo Start Deck" (Vyrgilla, Dragon Empire) and DZ-SS10 "Shiki Otei Start Deck" (Estacion, Stoicheia).
+   Rules text is a short summary written for this simulator from card listings, not the printed wording.
+   verified:false = the ability summary still needs checking against the printed card. */
+(function (root) {
+  'use strict';
+  function install(CARDS, H, DECKS) {
+    const DE = 'Dragon Empire', ST = 'Stoicheia';
+    const S9 = 'DZ-SS09', S10 = 'DZ-SS10';
+    const { firstVanguardDraw, sentinel, SENTINEL_TEXT } = H;
+    const DEF = { 3: [13000, 0, 'twin'], 2: [10000, 5000, 'intercept'], 1: [8000, 5000, 'boost'], 0: [6000, 5000, 'boost'] };
+    const mkU = set => (no, name, nation, grade, o) => { const [power, shield, skill] = DEF[grade]; return Object.assign({ set, no, name, nation, grade, type: 'unit', power, shield, skill, crit: 1, persona: grade === 3, abilities: [], verified: true }, o); };
+    const mkO = set => (no, name, nation, grade, order, o) => Object.assign({ set, no, name, nation, grade, type: 'order', order, power: 0, shield: 0, crit: 0, abilities: [], verified: true }, o);
+    const U9 = mkU(S9), U10 = mkU(S10), O9 = mkO(S9), O10 = mkO(S10);
+    const reissue = (srcId, set, no, extra) => CARDS[srcId] ? Object.assign({}, CARDS[srcId], { set, no, id: undefined, reprintOf: srcId }, extra || {}) : null;
+    const TRIG_TEXT = {
+      crit: 'Critical Trigger: one unit gets critical +1 and one unit gets +10000 until end of turn.',
+      draw: 'Draw Trigger: draw 1, and one unit gets +10000 until end of turn.',
+      front: 'Front Trigger: all your front row units get +10000 until end of turn.',
+      heal: 'Heal Trigger (max 4): one unit gets +10000; if your damage is equal to or greater than your opponent\'s, heal 1.'
+    };
+    const T = set => (no, name, nation, trigger, race) => ({ set, no, name, nation, grade: 0, type: 'unit', power: 5000, shield: trigger === 'draw' ? 5000 : 15000, skill: 'boost', crit: 1, trigger, race, abilities: [], verified: true, text: TRIG_TEXT[trigger] });
+    const G0TEXT = '[AUTO]: When this unit is rode upon, if you went second, draw 1.';
+    const opp = x => 1 - x.p;
+    const vgNamed = (g, p, part, minGrade) => { const vc = g.P(p).vc; return !!vc && g.def(vc.c).grade >= (minGrade == null ? 3 : minGrade) && g.name(vc.c).includes(part); };
+    const isUnit = (g, c) => g.def(c).type === 'unit' && !c.token;
+    const myTurn = (g, x) => g.active === x.p;
+    const selfPower = (n, cond) => (g, x) => x.targetUnit === x.unit && (!cond || cond(g, x)) ? n : 0;
+    const oppVG3 = (g, x) => { const v = g.P(opp(x)).vc; return !!v && g.def(v.c).grade >= 3; };
+    function* pickOne(g, p, title, opts) { const ans = yield { type: 'select', player: p, title, items: opts, min: 1, max: 1, purpose: 'mode' }; return g._validKeys(ans, opts, 1, 1)[0]; }
+    function* lookTop(g, p, n, o) {
+      const pl = g.P(p); const cs = pl.deck.splice(0, Math.min(n, pl.deck.length)); pl.trig.push(...cs);
+      if (cs.length) g.log(g.names[p] + ' looks at the top ' + cs.length + ' card' + (cs.length > 1 ? 's' : '') + ' of the deck.', p);
+      const picks = yield* g.selectCards(p, cs.filter(c => o.pick(c)), { title: o.title, min: o.min || 0, max: o.max || 1, purpose: o.purpose || 'callFromDeck' });
+      for (const c of picks) if (pl.trig.includes(c)) yield* o.take(c);
+      for (const c of cs) if (pl.trig.includes(c)) { g.take(pl.trig, c); if (o.rest === 'drop') pl.drop.push(c); else pl.deck.push(c); }
+      if (o.shuffle) g.shuffle(pl.deck);
+      g.checkRules(); return picks;
+    }
+    const toHand = function* (g, p, c) { const pl = g.P(p); g.take(pl.trig, c); pl.hand.push(c); g.log(g.names[p] + ' puts ' + g.name(c) + ' into hand.', p); };
+    const add9 = {}, add10 = {};
+
+    /* ======================= DZ-SS09 Vyrgilla ======================= */
+    const vyr = (g, x) => vgNamed(g, x.p, 'Vyrgilla', 0);
+    const vyr3 = (g, x) => vgNamed(g, x.p, 'Vyrgilla');
+    const isEzer = (g, u) => !!u && g.name(u.c).includes('Ezerwur');
+    add9['001'] = reissue('DZ-BT02/043', S9, '001');
+    add9['002'] = reissue('DZ-BT02/069', S9, '002');
+    add9['003'] = reissue('DZ-BT02/072', S9, '003');
+    add9['004'] = reissue('DZ-BT02/074', S9, '004');
+    add9['006'] = U9('006', 'Flag-raising of Courage, Fanvare', DE, 3, {
+      race: 'Galaxian',
+      text: '[AUTO]: When this unit is placed on (RC), [COST: SB1], choose one of your units with "Ezerwur" in its card name; it and this unit get +5000 until end of turn. If your opponent\'s vanguard is grade 3 or greater, they get +10000 instead.\n[AUTO](front row RC): At the end of your turn, if you have a grade 3 or greater vanguard with "Vyrgilla" in its card name and you played an Ultimate Skill this turn, [COST: put this unit into your soul], draw 1 and Counter-Charge 1.',
+      abilities: [
+        { kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'An Ezerwur and this unit +5000', cost: { sb: 1 }, cond: (g, x) => g.units(x.p).some(s => isEzer(g, s.u)),
+          resolve: function* (g, x) {
+            const n = oppVG3(g, x) ? 10000 : 5000;
+            const c = yield* g.chooseUnit(x.p, { filter: s => isEzer(g, s.u), title: 'Which Ezerwur gets +' + n / 1000 + 'k?', purpose: 'power' });
+            for (const u of [c && g.unitAt(x.p, c), x.unit]) if (u && g.circOf(x.p, u)) g.addMod(u, { power: n, until: 'turn' });
+            g.log('Ezerwur and ' + g.name(x.unit.c) + ' +' + n / 1000 + 'k.', x.p);
+          } },
+        { kind: 'AUTO', on: 'endOfTurn', zones: ['RC'], label: 'Draw 1 and Counter-Charge 1', cost: { selfToSoul: true },
+          cond: (g, x) => ['FL', 'FR'].includes(x.circ) && vyr3(g, x) && !!(g.tf.ultimatePlayed && g.tf.ultimatePlayed[x.p]),
+          resolve: function* (g, x) { g.draw(x.p, 1); g.counterCharge(x.p, 1); } }
+      ]
+    });
+    add9['007'] = U9('007', 'Ezerwur', DE, 2, {
+      race: 'Galaxian', power: 15000, shield: 15000, mate: 'Vyrgilla', noRide: true,
+      text: '[Mate Unit]-"Vyrgilla" (This card cannot be ridden. It can be called to (RC) or (GC) only if you have a vanguard with "Vyrgilla" in its card name.)',
+      abilities: []
+    });
+    add9['008'] = U9('008', 'Inductance Dragon', DE, 2, {
+      race: 'Thunder Dragon',
+      text: '[AUTO]: When this unit is placed on (RC) from hand, if you have a vanguard with "Vyrgilla" in its card name, [COST: SB1], look at the top seven cards of your deck, choose up to one Ultimate Skill, reveal it, put it into your hand, and shuffle your deck.\n[CONT](RC): If you have a grade 3 or greater vanguard with "Vyrgilla" in its card name, this unit gets [Boost].',
+      abilities: [
+        { kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'Search an Ultimate Skill in the top seven', cost: { sb: 1 }, cond: (g, x) => x.from === 'hand' && vyr(g, x),
+          resolve: function* (g, x) { yield* lookTop(g, x.p, 7, { title: 'Put up to one Ultimate Skill into your hand', pick: c => !!g.def(c).ultimate, shuffle: true, purpose: 'search', take: function* (c) { yield* toHand(g, x.p, c); } }); } },
+        { kind: 'CONT', zones: ['RC'], gainBoost: (g, x) => vyr3(g, x) }
+      ]
+    });
+    add9['009'] = U9('009', 'Opening of the End, Enwing', DE, 2, {
+      race: 'Dragoroid',
+      text: '[AUTO]: When this unit is placed on (RC), if you have a grade 3 or greater vanguard with "Vyrgilla" in its card name, [COST: EB3], choose one of your opponent\'s rear-guards and bind it.\n[AUTO](RC): When your rear-guard with "Ezerwur" in its card name attacks, this unit gets +5000 until end of turn.\n[CONT](GC): If you have a grade 3 or greater vanguard with "Vyrgilla" in its card name, this unit gets shield +10000.',
+      abilities: [
+        { kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'Bind an opponent\'s rear-guard', cost: { eb: 3 }, cond: (g, x) => vyr3(g, x) && g.rearguards(opp(x)).length > 0,
+          resolve: function* (g, x) { const c = yield* g.chooseUnit(x.p, { owner: opp(x), rearOnly: true, title: 'Bind which of your opponent\'s rear-guards?', purpose: 'retire', alwaysAsk: true }); if (c) { const u = g.removeUnit(opp(x), c, 'bind'); if (u) { g.log(g.name(u.c) + ' is bound.', x.p); (g.tf.lostRG || (g.tf.lostRG = [false, false]))[opp(x)] = true; } } } },
+        { kind: 'AUTO', on: 'allyAttacks', zones: ['RC'], label: 'This unit +5000', cond: (g, x) => !!g.battle && g.battle.aUnit !== x.unit && isEzer(g, g.battle.aUnit) && g.circOf(x.p, g.battle.aUnit) !== 'VC',
+          resolve: function* (g, x) { g.addMod(x.unit, { power: 5000, until: 'turn' }); g.log(g.name(x.unit.c) + ' +5000.', x.p); } },
+        { kind: 'CONT', zones: ['GC'], shield: (g, x) => vyr3(g, x) ? 10000 : 0 }
+      ]
+    });
+    add9['010'] = U9('010', 'Stealth Fiend, Shenryi', DE, 1, {
+      race: 'Ghost',
+      text: '[AUTO](RC): When this unit boosts, if your opponent has one or fewer rear-guards, or you played an order this turn, this unit gets +5000 until end of that battle. At the end of that battle, [COST: put this unit into your soul], draw 1.',
+      abilities: [{ kind: 'AUTO', on: 'boost', zones: ['RC'], label: 'This unit +5000', cond: (g, x) => g.rearguards(opp(x)).length <= 1 || !!g.tf.orderThisTurn[x.p],
+        resolve: function* (g, x) {
+          g.addMod(x.unit, { power: 5000, until: 'battle' }); g.log(g.name(x.unit.c) + ' +5000.', x.p);
+          g.grant(x.unit, { kind: 'AUTO', on: 'boostEnd', zones: ['RC'], label: 'Into the soul: draw 1', cost: { selfToSoul: true }, resolve: function* (gg, xx) { gg.draw(xx.p, 1); } }, 'battle');
+        } }]
+    });
+    add9['011'] = U9('011', 'Flare Cosmor', DE, 1, {
+      race: 'Galaxian',
+      text: '[AUTO](Drop): When your unit with "Ezerwur" in its card name is placed on (RC), [COST: CB1], call this card to the back row (RC) in the same column as that unit. If that unit was placed by the ability of your vanguard with "Vyrgilla" in its card name, this costs CB1 less.\n[AUTO](back row RC): When your unit with "Ezerwur" in its card name [Stand]s during your battle phase, [Stand] this unit.',
+      abilities: [
+        { kind: 'AUTO', on: 'allyPlaced', zones: ['drop'], optional: true, label: 'Call this card behind the Ezerwur', cost: (g, x) => x.byVG && vyr(g, x) ? null : { cb: 1 },
+          cond: (g, x) => isEzer(g, x.trigUnit) && ['FL', 'FR'].includes(g.circOf(x.p, x.trigUnit)) && g.P(x.p).drop.includes(x.card) && g.def(x.card).grade <= g.vgGrade(x.p),
+          resolve: function* (g, x) { const f = g.circOf(x.p, x.trigUnit); if (!f || !g.P(x.p).drop.includes(x.card)) return; yield* g.callFrom(x.p, x.card, 'drop', { from: 'drop', circles: [f === 'FL' ? 'BL' : 'BR'] }); } },
+        { kind: 'AUTO', on: 'stoodBy', zones: ['RC'], label: 'Stand this unit', cond: (g, x) => ['BL', 'BC', 'BR'].includes(x.circ) && g.phase === 'battle' && x.trigUnit !== x.unit && isEzer(g, x.trigUnit) && x.unit.rested,
+          resolve: function* (g, x) { x.unit.rested = false; g.log(g.name(x.unit.c) + ' stands.', x.p); } }
+      ]
+    });
+    add9['012'] = reissue('D-SD01/008', S9, '012');
+    add9['013'] = reissue('D-BT01/013', S9, '013');
+    add9['014'] = T(S9)('014', 'Rogue Beast, Sunegosuri', DE, 'crit', 'Warbeast');
+    add9['015'] = T(S9)('015', 'Jaggy Dagger Dragon', DE, 'draw', 'Thunder Dragon');
+    add9['016'] = T(S9)('016', 'Electrake Dracokid', DE, 'front', 'Thunder Dragon');
+    add9['017'] = T(S9)('017', 'Refreshing Wind Dragon, Dinobreeze', DE, 'heal', 'Dinodragon');
+    // Stardust Blade (DZ-BT02/077): full text and Ultimate Skill tag
+    const sb = CARDS['DZ-BT02/077'];
+    if (sb) {
+      Object.assign(sb, { ultimate: true, verified: true,
+        text: 'Normal Order (Ultimate Skill). Play only if you have a vanguard with "Vyrgilla" in its card name. [COST: CB1] Look at the top five cards of your deck, choose up to one unit with a grade equal to or less than your vanguard\'s, call it to (RC), and shuffle your deck. Then choose one of your vanguards; until end of turn, it gets "[AUTO](VC): When your rear-guard is retired by your opponent\'s card ability, search your deck for up to one normal unit, call it to (RC), and shuffle your deck." and "[CONT](VC): This unit gets +3000 for each normal unit on your (RC) and in your drop."' });
+      const play0 = sb.play;
+      sb.play = function* (g, x) {
+        yield* play0(g, x);
+        const vc = g.P(x.p).vc; if (!vc) return;
+        g.grant(vc, { kind: 'CONT', zones: ['VC'], power: (gg, xx) => xx.targetUnit === xx.unit ? 3000 * (gg.rearguards(xx.p).filter(r => isUnit(gg, r.u.c) && !gg.def(r.u.c).trigger).length + gg.P(xx.p).drop.filter(c => isUnit(gg, c) && !gg.def(c).trigger).length) : 0 }, 'turn');
+        g.log(g.name(vc.c) + ' gets +3000 for each normal unit on your (RC) and in your drop this turn.', x.p);
+      };
+    }
+    add9['018'] = reissue('DZ-BT02/077', S9, '018');
+    add9['019'] = O9('019', 'Blazing Star Cross', DE, 2, 'normal', {
+      ultimate: true, cost: { sb: 1 }, verified: false,
+      text: 'Normal Order (Ultimate Skill). Play only if you have a vanguard with "Vyrgilla" in its card name. [COST: SB1] Choose one of your units with "Ezerwur" in its card name; it gets +10000 until end of turn. If your opponent\'s vanguard is grade 3 or greater, it also gets "[AUTO]: When this unit [Stand]s by the ability of your vanguard with "Vyrgilla" in its card name, if your opponent\'s bind zone has three or more cards, or you persona rode this turn, this unit gets critical +1 until end of turn." until end of turn.',
+      canPlay: (g, x) => vyr(g, x) && g.units(x.p).some(s => isEzer(g, s.u)),
+      play: function* (g, x) {
+        const c = yield* g.chooseUnit(x.p, { filter: s => isEzer(g, s.u), title: 'Which Ezerwur gets +10000?', purpose: 'power' }); if (!c) return;
+        const u = g.unitAt(x.p, c); g.addMod(u, { power: 10000, until: 'turn' }); g.log(g.name(u.c) + ' +10000.', x.p);
+        if (oppVG3(g, x)) g.grant(u, { kind: 'AUTO', on: 'stoodBy', zones: ['RC'], label: 'Critical +1',
+          cond: (gg, xx) => xx.trigUnit === xx.unit && !!xx.by && gg.name(xx.by).includes('Vyrgilla') && (gg.P(1 - xx.p).bind.length >= 3 || !!gg.tf.persona[xx.p]),
+          resolve: function* (gg, xx) { gg.addMod(xx.unit, { crit: 1, until: 'turn' }); gg.log(gg.name(xx.unit.c) + ' critical +1.', xx.p); } }, 'turn');
+      }
+    });
+    add9['020'] = O9('020', 'Union the Sky', null, 2, 'blitz', {
+      regalis: true, cost: { alt: [{ cb: 1 }, { eb: 3 }] }, verified: false,
+      text: 'Regalis Piece (one per deck, used once per fight). Blitz Order. [COST: CB1 or EB3] Draw 1 and remove this card. Choose one of your vanguards; it gets +15000 until end of that battle. Then you may [COST: bind a card with the same card name as your vanguard from your soul or drop]; if you do, it gets +25000 instead.\n[AUTO]: When this card is discarded from your hand when riding from the ride deck, [COST: CB1 or EB3], draw 1 and remove this card.',
+      canPlay: (g, x) => !!g.battle && g.battle.tp === x.p && !g.P(x.p).perm.regalisUsed,
+      play: function* (g, x) {
+        const pl = g.P(x.p); pl.perm.regalisUsed = true; g.draw(x.p, 1);
+        if (pl.drop.includes(x.card)) { g.take(pl.drop, x.card); pl.removed.push(x.card); }
+        const vc = pl.vc; if (!vc) return; const nm = g.name(vc.c);
+        const pool = pl.soul.concat(pl.drop).filter(c => g.name(c) === nm);
+        let n = 15000;
+        if (pool.length && (yield* g.yesno(x.p, 'Union the Sky: bind a "' + nm + '" from your soul or drop for +25000 instead?', 'ability'))) {
+          const c = pool[0]; g.take(pl.soul.includes(c) ? pl.soul : pl.drop, c); pl.bind.push(c); n = 25000; g.log(g.name(c) + ' is bound.', x.p);
+        }
+        g.addMod(vc, { power: n, until: 'battle' }); g.log(nm + ' +' + n / 1000 + 'k.', x.p);
+      },
+      abilities: [{ kind: 'AUTO', on: 'discarded', label: 'Draw 1 and remove this card', cost: { alt: [{ cb: 1 }, { eb: 3 }] },
+        cond: (g, x) => !!g.tf.rideCost && g.active === x.p && g.P(x.p).drop.includes(x.card) && !g.P(x.p).perm.regalisUsed,
+        resolve: function* (g, x) { const pl = g.P(x.p); pl.perm.regalisUsed = true; g.draw(x.p, 1); if (pl.drop.includes(x.card)) { g.take(pl.drop, x.card); pl.removed.push(x.card); g.log(g.name(x.card) + ' is removed from the game.', x.p); } } }]
+    });
+
+    /* ======================= DZ-SS10 Estacion ======================= */
+    const PLANT = 'TOKEN/PLANT', BLAST = 'TOKEN/BLAST';
+    const est = (g, x) => vgNamed(g, x.p, 'Estacion', 0);
+    const blastOf = (g, p) => { const r = g.rearguards(p).find(r => r.u.c.id === BLAST); return r ? r.u : null; };
+    const gauges = (g, p) => { const b = blastOf(g, p); return b ? b.under.length + (b.tgauge || 0) : 0; };
+    function* addGauge(g, p, card) {
+      const b = blastOf(g, p); if (!b) return false;
+      if (card) b.under.push(card); else b.tgauge = (b.tgauge || 0) + 1;
+      g.log((card ? g.name(card) : 'A Plant token') + ' becomes a plant gauge (' + gauges(g, p) + ').', p);
+      yield* g.fire('gaugePut', { p, card });
+      return true;
+    }
+    function* callPlant(g, p, toGauge) {
+      if (toGauge && blastOf(g, p)) return yield* addGauge(g, p, null);
+      const empty = g.emptyRC(p); if (!empty.length) return false;
+      const circ = empty.length === 1 ? empty[0] : yield* g.chooseCircle(p, { title: 'Call a Plant token to which circle?', circles: empty });
+      yield* g.callTo(p, g.mkToken(PLANT), circ, 'token'); return true;
+    }
+    function* discardGauges(g, p, n) {
+      const b = blastOf(g, p); if (!b) return 0;
+      const items = b.under.map(c => ({ key: 'c' + c.iid, label: g.name(c), id: c.id, iid: c.iid })).concat(Array.from({ length: b.tgauge || 0 }, (_, i) => ({ key: 'tok' + i, label: 'Plant token gauge' })));
+      const ans = yield { type: 'select', player: p, title: 'Discard ' + n + ' plant gauges', items, min: n, max: n, purpose: 'soulblast' };
+      const keys = g._validKeys(ans, items, n, n); const out = [];
+      for (const k of keys) {
+        if (k.startsWith('tok')) { b.tgauge--; continue; }
+        const c = b.under.find(cc => 'c' + cc.iid === k); if (!c) continue; g.take(b.under, c); g.P(p).drop.push(c); out.push(c);
+      }
+      g.log(g.names[p] + ' discards ' + keys.length + ' plant gauges (' + gauges(g, p) + ' left).', p);
+      for (const c of out) yield* g.fire('gaugeDiscarded', { p, card: c });
+      return keys.length;
+    }
+    CARDS[PLANT] = { id: PLANT, set: 'TOKEN', no: '', name: 'Plant', nation: ST, grade: 0, type: 'unit', token: true, power: 5000, shield: 0, skill: 'boost', crit: 1, race: 'Plant', abilities: [], verified: true, text: 'Token unit (grade 0, 5000 power, Boost). It ceases to exist when it leaves the field.' };
+    CARDS[BLAST] = { id: BLAST, set: 'TOKEN', no: '', name: 'Blast', nation: ST, grade: 0, type: 'unit', token: true, power: 5000, shield: 0, skill: 'boost', crit: 1, race: 'Forest Dragon', verified: true,
+      text: 'Token unit (grade 0, 5000 power, Boost). Cards put under it are its "plant gauge".\n[CONT](RC): This unit cannot move to other circles. If you have a vanguard with "Estacion" in its card name, it also gets:\n- [CONT]: This unit cannot be chosen by your opponent\'s card effects.\n- [ACT](RC)[1/turn]: [COST: put two or three of your other rear-guards into this unit\'s plant gauge], draw 1.\n- [CONT]: During your turn, if your vanguard is grade 3 or greater, all of your front row units get +5000 for every three plant gauges.',
+      abilities: [
+        { kind: 'CONT', zones: ['RC'], oppImmune: (g, x) => est(g, x) },
+        { kind: 'ACT', zones: ['RC'], oncePerTurn: true, label: 'Two or three rear-guards into the plant gauge: draw 1', cond: (g, x) => est(g, x) && g.rearguards(x.p).filter(r => r.u !== x.unit).length >= 2,
+          resolve: function* (g, x) {
+            const pool = g.rearguards(x.p).filter(r => r.u !== x.unit);
+            const items = pool.map(r => ({ key: x.p + ':' + r.circ, label: g.name(r.u.c) + ' (' + r.circ + ')', id: r.u.c.id, circ: r.circ, owner: x.p }));
+            const ans = yield { type: 'select', player: x.p, title: 'Put two or three rear-guards into the plant gauge', items, min: 2, max: 3, purpose: 'costSoul' };
+            const keys = g._validKeys(ans, items, 2, 3);
+            for (const k of keys) {
+              const circ = k.split(':')[1]; const u = g.unitAt(x.p, circ); if (!u) continue;
+              g.setUnit(x.p, circ, null); g.toZone(x.p, u.under, 'drop');
+              yield* addGauge(g, x.p, u.c.token ? null : u.c);
+            }
+            g.draw(x.p, 1);
+          } },
+        { kind: 'CONT', zones: ['RC'], power: (g, x) => est(g, x) && myTurn(g, x) && g.vgGrade(x.p) >= 3 && ['VC', 'FL', 'FR'].includes(x.target) ? 5000 * Math.floor(gauges(g, x.p) / 3) : 0 }
+      ] };
+    const SEASON = /Winter|Summer|Autumn|Spring/;
+    add10['001'] = U10('001', 'Legend of the Celestial Fury, Estacion', ST, 3, {
+      race: 'Forest Dragon', verified: false,
+      text: '[ACT](VC)[1/turn]: If you have a Blast token, a Plant token that would be placed on (RC) by this effect is put into your Blast token\'s plant gauge instead. [COST: CB1], call up to one Plant token to (RC), look at the top three cards of your deck, choose one, put it into your hand, and shuffle your deck. If you have six or more plant gauges, look at the top five instead.\n[AUTO](VC): When this unit attacks, [COST: discard two plant gauges], search your deck or drop for up to one season unit (Winter/Summer/Autumn/Spring), call it to (RC), and if you searched your deck, shuffle it.\n(The target of the attack ability is summarized; it needs checking against the printed card.)',
+      abilities: [
+        { kind: 'ACT', zones: ['VC'], oncePerTurn: true, label: 'Plant token, look at the top three (five)', cost: { cb: 1 },
+          resolve: function* (g, x) {
+            yield* callPlant(g, x.p, true);
+            const n = gauges(g, x.p) >= 6 ? 5 : 3;
+            yield* lookTop(g, x.p, n, { title: 'Put one card into your hand', pick: () => true, min: 1, shuffle: true, purpose: 'search', take: function* (c) { yield* toHand(g, x.p, c); } });
+          } },
+        { kind: 'AUTO', on: 'attack', zones: ['VC'], label: 'Call a season unit from the deck or drop', cond: (g, x) => gauges(g, x.p) >= 2,
+          resolve: function* (g, x) {
+            if ((yield* discardGauges(g, x.p, 2)) < 2) return;
+            const pl = g.P(x.p); const f = c => isUnit(g, c) && SEASON.test(g.name(c)) && g.def(c).grade <= g.vgGrade(x.p);
+            const pool = pl.deck.filter(f).concat(pl.drop.filter(f));
+            const cs = yield* g.selectCards(x.p, pool, { title: 'Call up to one season unit from your deck or drop', min: 0, max: 1, purpose: 'callFromDeck' });
+            for (const c of cs) { const fromDeck = pl.deck.includes(c); g.take(fromDeck ? pl.deck : pl.drop, c); pl.trig.push(c); yield* g.callFrom(x.p, c, 'trig', { from: fromDeck ? 'deck' : 'drop' }); if (fromDeck) g.shuffle(pl.deck); }
+          } }
+      ]
+    });
+    add10['002'] = U10('002', 'Legend of the Raging Skies, Estacion', ST, 2, {
+      race: 'Forest Dragon',
+      text: '[AUTO]: When this unit is placed on (VC) by riding from "Legend of the Chaotic Dance, Estacion", search your deck for up to one "Vital Blaze Blast", reveal it, put it into your hand, and shuffle your deck.',
+      abilities: [{ kind: 'AUTO', on: 'placedVC', zones: ['VC'], label: 'Search a Vital Blaze Blast', cond: (g, x) => g.P(x.p).soul.some(c => g.name(c) === 'Legend of the Chaotic Dance, Estacion') && g.P(x.p).deck.some(c => g.name(c) === 'Vital Blaze Blast'),
+        resolve: function* (g, x) { const cs = yield* g.searchDeck(x.p, { title: 'Put a Vital Blaze Blast into your hand', filter: c => g.name(c) === 'Vital Blaze Blast', max: 1 }); for (const c of cs) yield* toHand(g, x.p, c); } }]
+    });
+    add10['003'] = U10('003', 'Legend of the Chaotic Dance, Estacion', ST, 1, {
+      race: 'Forest Dragon',
+      text: '[AUTO]: When this unit is rode upon by "Legend of the Raging Skies, Estacion", [COST: Soul-Blast 1 (a card with "Estacion" in its card name)], reveal a grade 3 card with "Estacion" in its card name from your ride deck, and call a Blast token to your back row center (RC).',
+      abilities: [{ kind: 'AUTO', on: 'rodeUpon', label: 'Call a Blast token', cost: { sbPick: { n: 1, label: 'a card with "Estacion" in its card name', filter: (g, c) => g.name(c).includes('Estacion') } },
+        cond: (g, x) => g.name(x.newCard) === 'Legend of the Raging Skies, Estacion' && g.P(x.p).rideDeck.some(c => g.def(c).grade === 3 && g.name(c).includes('Estacion')),
+        resolve: function* (g, x) { yield* g.callTo(x.p, g.mkToken(BLAST), 'BC', 'token'); } }]
+    });
+    add10['004'] = U10('004', 'Estacion', ST, 0, { race: 'Forest Dragon', text: G0TEXT, abilities: [firstVanguardDraw] });
+    add10['006'] = U10('006', 'Solitario Frio of Absolute Winter', ST, 3, {
+      race: 'Forest Dragon', verified: false,
+      text: '[AUTO]: When this unit is placed on (RC) by a card\'s ability, if you have five or more plant gauges, until end of your opponent\'s next turn, this unit cannot be chosen by your opponent\'s card effects, and it gets critical +1 (until end of turn).\n[AUTO](RC)/(Hand): At the beginning of the guard step, if your unit with "Estacion" in its card name is attacked, [COST: put this card into your drop], choose one of your attacked units; it gets +10000 until end of that battle.',
+      abilities: [
+        { kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'Untargetable, critical +1', cond: (g, x) => x.from !== 'hand' && gauges(g, x.p) >= 5,
+          resolve: function* (g, x) { x.unit.protectUntil = g.turn + 1; g.addMod(x.unit, { crit: 1, until: 'turn' }); g.log(g.name(x.unit.c) + ' cannot be chosen by your opponent and gets critical +1.', x.p); } },
+        { kind: 'AUTO', on: 'guardStepDef', optional: true, label: 'Into the drop: an attacked unit +10000',
+          cond: (g, x) => !!g.battle && g.battle.tp === x.p && g.liveTargets().some(u => g.name(u.c).includes('Estacion')) && (g.P(x.p).hand.includes(x.card) || (!!x.unit && !!g.circOf(x.p, x.unit) && g.circOf(x.p, x.unit) !== 'VC')),
+          resolve: function* (g, x) {
+            const pl = g.P(x.p);
+            if (pl.hand.includes(x.card)) { g.take(pl.hand, x.card); pl.drop.push(x.card); }
+            else if (x.unit && g.circOf(x.p, x.unit)) g.removeUnit(x.p, g.circOf(x.p, x.unit), 'drop');
+            else return;
+            g.log(g.name(x.card) + ' goes to the drop.', x.p);
+            const ts = g.liveTargets(); let u = ts[0];
+            if (ts.length > 1) { const c = yield* g.chooseUnit(x.p, { filter: s => ts.includes(s.u), title: 'Which attacked unit gets +10000?', purpose: 'defend', alwaysAsk: true }); if (c) u = g.unitAt(x.p, c); }
+            if (u) { g.addMod(u, { power: 10000, until: 'battle' }); g.log(g.name(u.c) + ' +10000.', x.p); }
+          } }
+      ]
+    });
+    add10['007'] = U10('007', 'Ignacio of Blazing Summer', ST, 2, {
+      race: 'Forest Dragon', verified: true,
+      text: '[AUTO]: When this unit is placed on (RC) by a card\'s ability, if you have three or more plant gauges, choose one of your opponent\'s rear-guards; until end of your opponent\'s next turn, it cannot intercept and does not [Stand] during its stand phase.\n[CONT](RC)/(GC): If you have a vanguard with "Estacion" in its card name and a Blast token, this unit gets +5000 power / shield +5000.',
+      abilities: [
+        { kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'Freeze an opponent\'s rear-guard', cond: (g, x) => x.from !== 'hand' && gauges(g, x.p) >= 3 && g.rearguards(opp(x)).length > 0,
+          resolve: function* (g, x) { const c = yield* g.chooseUnit(x.p, { owner: opp(x), rearOnly: true, title: 'Which rear-guard cannot intercept or stand next turn?', purpose: 'retire', alwaysAsk: true }); if (c) { const u = g.unitAt(opp(x), c); u.noInterceptUntil = g.turn + 1; u.noStandTurn = g.turn + 1; g.log(g.name(u.c) + ' cannot intercept or stand until end of your opponent\'s next turn.', x.p); } } },
+        { kind: 'CONT', zones: ['RC'], power: selfPower(5000, (g, x) => est(g, x) && !!blastOf(g, x.p)) },
+        { kind: 'CONT', zones: ['GC'], shield: (g, x) => est(g, x) && blastOf(g, x.p) ? 5000 : 0 }
+      ]
+    });
+    add10['008'] = U10('008', 'Granorindo of Daybreak Autumn', ST, 2, {
+      race: 'Forest Dragon',
+      text: '[AUTO](Drop): During your main phase, when your plant gauge is put, if you have a vanguard with "Estacion" in its card name, [COST: CB1], call this card to (RC).\n[AUTO]: When this unit is placed on (RC), if you have a vanguard with "Estacion" in its card name, you may call up to one Plant token to (RC).',
+      abilities: [
+        { kind: 'AUTO', on: 'gaugePut', zones: ['drop'], label: 'Call this card from the drop', cost: { cb: 1 },
+          cond: (g, x) => g.phase === 'main' && g.active === x.p && est(g, x) && g.P(x.p).drop.includes(x.card) && g.def(x.card).grade <= g.vgGrade(x.p) && g.emptyRC(x.p).length > 0,
+          resolve: function* (g, x) { if (g.P(x.p).drop.includes(x.card)) yield* g.callFrom(x.p, x.card, 'drop', { from: 'drop', circles: g.emptyRC(x.p) }); } },
+        { kind: 'AUTO', on: 'placedRC', zones: ['RC'], optional: true, label: 'Call a Plant token', cond: (g, x) => est(g, x) && g.emptyRC(x.p).length > 0, resolve: function* (g, x) { yield* callPlant(g, x.p, false); } }
+      ]
+    });
+    add10['009'] = U10('009', 'Lusdiana of Sunny Spring', ST, 1, {
+      race: 'Forest Dragon',
+      text: '[ACT](RC)[1/turn]: If you have a vanguard with "Estacion" in its card name, [COST: EB3], call a Plant token to (RC).\n[AUTO](RC): When this unit boosts, if you have six or more plant gauges, this unit gets +2000 until end of that battle.',
+      abilities: [
+        { kind: 'ACT', zones: ['RC'], oncePerTurn: true, label: 'Call a Plant token', cost: { eb: 3 }, cond: (g, x) => est(g, x) && g.emptyRC(x.p).length > 0, resolve: function* (g, x) { yield* callPlant(g, x.p, false); } },
+        { kind: 'AUTO', on: 'boost', zones: ['RC'], label: 'This unit +2000', cond: (g, x) => gauges(g, x.p) >= 6, resolve: function* (g, x) { g.addMod(x.unit, { power: 2000, until: 'battle' }); } }
+      ]
+    });
+    add10['010'] = U10('010', 'Conceited Noble, Philander', ST, 1, {
+      race: 'Bioroid',
+      text: '[AUTO]: When this unit is placed on (RC) from hand, look at the top five cards of your deck, choose up to one, discard it, and shuffle your deck.\n[CONT](RC): During your turn, if you have ten or more cards in your drop, this unit gets +10000.',
+      abilities: [
+        { kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'Discard one of the top five', cond: (g, x) => x.from === 'hand',
+          resolve: function* (g, x) { yield* lookTop(g, x.p, 5, { title: 'Discard up to one card', pick: () => true, shuffle: true, purpose: 'discard', take: function* (c) { const pl = g.P(x.p); g.take(pl.trig, c); pl.drop.push(c); g.log(g.name(c) + ' is discarded.', x.p); } }); } },
+        { kind: 'CONT', zones: ['RC'], power: selfPower(10000, (g, x) => myTurn(g, x) && g.P(x.p).drop.length >= 10) }
+      ]
+    });
+    add10['011'] = U10('011', 'Hopeful Maiden, Alejandra', ST, 1, { race: 'Bioroid', power: 7000, shield: 0, sentinel: true, text: SENTINEL_TEXT, abilities: [sentinel] });
+    add10['012'] = U10('012', 'Burrow Mushrooms', ST, 1, {
+      race: 'Dryad', power: 6000,
+      text: '[ACT](RC): [COST: put this unit into your soul], call up to two Plant tokens to (RC). If you have a grade 3 or greater vanguard with "Granfia" in its card name, choose one of your rear-guards; it gets +5000 until end of turn.',
+      abilities: [{ kind: 'ACT', zones: ['RC'], label: 'Into the soul: call two Plant tokens', cost: { selfToSoul: true },
+        resolve: function* (g, x) { for (let i = 0; i < 2; i++) yield* callPlant(g, x.p, false); if (vgNamed(g, x.p, 'Granfia')) yield* g.buff(x.p, { power: 5000, rearOnly: true, until: 'turn' }); } }]
+    });
+    add10['013'] = reissue('D-BT01/025', S10, '013');
+    add10['014'] = T(S10)('014', 'Peppery Pepper', ST, 'crit', 'Plant');
+    add10['015'] = T(S10)('015', 'Satisfying Harvest, Rabbirit', ST, 'draw', 'Warbeast');
+    add10['016'] = T(S10)('016', 'Poetic Maiden, Sapphira', ST, 'front', 'Bioroid');
+    add10['017'] = T(S10)('017', 'Cheery Support Elf', ST, 'heal', 'Elf');
+    add10['018'] = O10('018', 'Vital Blaze Blast', ST, 2, 'normal', {
+      cost: { sb: 1 },
+      text: 'Normal Order. Play only if you have a vanguard with "Estacion" in its card name. [COST: SB1] Put this card face up into your Blast token\'s plant gauge. Look at the top five cards of your deck, choose up to one unit with a grade equal to or less than your vanguard\'s, call it to (RC), and shuffle your deck. If you did not call, you may call up to one Plant token to (RC).\n[AUTO]: When this card is discarded from the plant gauge during your turn, choose one of your units; it gets +5000 until end of turn.',
+      canPlay: (g, x) => est(g, x),
+      play: function* (g, x) {
+        const pl = g.P(x.p);
+        if (blastOf(g, x.p) && pl.drop.includes(x.card)) { g.take(pl.drop, x.card); yield* addGauge(g, x.p, x.card); }
+        const picks = yield* lookTop(g, x.p, 5, { title: 'Call up to one unit', pick: c => isUnit(g, c) && g.def(c).grade <= g.vgGrade(x.p), shuffle: true, take: function* (c) { yield* g.callFrom(x.p, c, 'trig', { from: 'deck' }); } });
+        if (!picks.length && g.emptyRC(x.p).length && (yield* g.yesno(x.p, 'Call a Plant token?', 'ability'))) yield* callPlant(g, x.p, false);
+      },
+      abilities: [{ kind: 'AUTO', on: 'gaugeDiscarded', label: 'A unit +5000', cond: (g, x) => g.active === x.p, resolve: function* (g, x) { yield* g.buff(x.p, { power: 5000, until: 'turn', title: 'Vital Blaze Blast: +5000 to which unit?' }); } }]
+    });
+    add10['019'] = reissue('D-BT01/119', S10, '019');
+    add10['020'] = reissue('DZ-SS13/018', S10, '020');
+
+    for (const [set, a] of [[S9, add9], [S10, add10]]) for (const no in a) if (a[no]) CARDS[set + '/' + no] = a[no];
+
+    const deck = (name, set, ride, counts) => {
+      const c = {}; for (const id in counts) c[id.includes('/') ? id : set + '/' + id] = counts[id];
+      return { name, ride: ride.map(id => id.includes('/') ? id : set + '/' + id), counts: c };
+    };
+    DECKS.vyrgilla = deck('Zero Tendo: Vyrgilla (Dragon Empire)', S9, ['004', '003', '002', '001'],
+      { '001': 3, '006': 4, '007': 4, '008': 4, '009': 3, '010': 3, '011': 4, '018': 2, '019': 2, '020': 1,
+        '012': 4, '013': 1, '014': 4, '015': 4, '016': 3, '017': 4 });
+    DECKS.estacion = deck('Shiki Otei: Estacion (Stoicheia)', S10, ['004', '003', '002', '001'],
+      { '001': 3, '006': 4, '007': 4, '008': 4, '009': 4, '010': 4, '012': 2, '018': 3, '019': 1, '020': 1,
+        '011': 4, '013': 1, '014': 4, '015': 4, '016': 3, '017': 4 });
+  }
+  if (typeof module !== 'undefined' && module.exports) module.exports = install; else root.VGCardsDZSS0910 = install;
+})(this);
 
 ;
 /* Card database. Stats and abilities follow the printed English cards; rules text below is a short summary written for the simulator.
@@ -5346,6 +5694,8 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
   if (dzbt02) dzbt02(CARDS, helpers, DECKS);
   const dbt02 = root.VGCardsDBT02 || (typeof require !== 'undefined' ? require('./cards_dbt02.js') : null);
   if (dbt02) dbt02(CARDS, helpers, DECKS);
+  const dzss0910 = root.VGCardsDZSS0910 || (typeof require !== 'undefined' ? require('./cards_dzss0910.js') : null);
+  if (dzss0910) dzss0910(CARDS, helpers, DECKS);
   for (const id in CARDS) { CARDS[id].id = id; if (!CARDS[id].abilities) CARDS[id].abilities = []; }
 
   function expandDeck(d) { const main = []; for (const id in d.counts) for (let i = 0; i < d.counts[id]; i++) main.push(id); return { ride: d.ride.slice(), main, crest: [].concat(d.crest || 'DZ-SS13/005') }; } // current rules: every deck has an Energy Generator
@@ -5475,7 +5825,9 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
     }
     hasPrison(p) { return this.P(p).orderZone.some(c => this.def(c).prison); }
     contFlag(p, circ, u, key) { return this.abilitiesOf(u.c, u).some(ab => ab.kind === 'CONT' && ab[key] && this.zoneOk(ab, circ) && (typeof ab[key] !== 'function' || ab[key](this, { p, unit: u, circ }))); }
+    mateOk(p, d) { if (!d.mate) return true; const vc = this.P(p).vc; return !!vc && this.name(vc.c).includes(d.mate); }
     canIntercept(p, circ, u) {
+      if (u.noInterceptUntil >= this.turn) return false;
       const back = ['BL', 'BC', 'BR'].includes(circ);
       if (back && !this.contFlag(p, circ, u, 'interceptBack')) return false;
       return this.def(u.c).skill === 'intercept' || this.contFlag(p, circ, u, 'gainIntercept');
@@ -5804,7 +6156,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
       let list = this.units(owner);
       if (o.rearOnly) list = list.filter(x => x.circ !== 'VC');
       if (o.filter) list = list.filter(x => o.filter(x));
-      if (owner !== p) list = list.filter(x => !(x.circ !== 'VC' && this.def(x.u.c).untargetableRC) && !this.protectedFront(owner, x.circ));
+      if (owner !== p) list = list.filter(x => !(x.circ !== 'VC' && this.def(x.u.c).untargetableRC) && !this.protectedFront(owner, x.circ) && !(x.u.protectUntil >= this.turn) && !this.contFlag(owner, x.circ, x.u, 'oppImmune'));
       if (!list.length) return null;
       const items = list.map(x => ({ key: owner + ':' + x.circ, label: this.name(x.u.c) + ' (' + CIRC_PT[x.circ] + ')', id: x.u.c.id, circ: x.circ, owner }));
       const min = o.optional ? 0 : 1;
@@ -5861,6 +6213,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
       if (from === 'soul') u.fromSoulTurn = this.turn;
       this.log(this.names[p] + ' calls ' + this.name(card) + ' to ' + CIRC_PT[circ] + '.', p);
       yield* this.fire('placedRC', { p, unit: u, circ, from, byVG });
+      if (this.unitAt(p, circ) === u) yield* this.fire('allyPlaced', { p, unit: u, circ, from, byVG });
     }
     *overDress(p, card, circ) {
       const old = this.unitAt(p, circ); const u = this.mkUnit(card);
@@ -5961,7 +6314,9 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
           add(ctx.p, ctx.card, null, null);
           for (const x of this.units(ctx.p)) add(ctx.p, x.u.c, x.u, x.circ); break;
         case 'discarded': add(ctx.p, ctx.card, null, null); break;
-        case 'retiredBy': case 'toSoulFromRC': case 'boundFromRC': case 'toSoulByAbility': case 'retiredAsCost': case 'driveChecked': add(ctx.p, ctx.card, null, null); break;
+        case 'retiredBy': case 'toSoulFromRC': case 'boundFromRC': case 'toSoulByAbility': case 'retiredAsCost': case 'driveChecked': case 'gaugeDiscarded': add(ctx.p, ctx.card, null, null); break;
+        case 'allyPlaced': case 'gaugePut': for (const c of this.P(ctx.p).drop.slice()) add(ctx.p, c, null, null); break;
+        case 'guardStepDef': { const b = this.battle; for (const x of this.units(b.tp)) add(b.tp, x.u.c, x.u, x.circ); for (const c of this.P(b.tp).hand.slice()) add(b.tp, c, null, null); break; }
         case 'vgPlaced': for (const x of this.rearguards(ctx.p)) add(ctx.p, x.u.c, x.u, x.circ); break;
         case 'battleEndHand': { const b = this.battle; for (const c of this.P(b.ap).hand.slice()) add(b.ap, c, null, null); break; }
         case 'vgHit': { const b = this.battle; if (b.aUnit === this.P(b.ap).vc) for (const x of this.rearguards(b.ap)) add(b.ap, x.u.c, x.u, x.circ); break; }
@@ -6082,7 +6437,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
           const p = this.active;
           this.tf = this._newTurnFlags();
           this.log('— Turn ' + this.turn + ' (' + this.names[p] + ') —', p);
-          this.phase = 'stand'; for (const x of this.units(p)) x.u.rested = false; for (const c of this.P(p).orderZone) c.rested = false;
+          this.phase = 'stand'; for (const x of this.units(p)) { if (x.u.noStandTurn === this.turn) { this.log(this.name(x.u.c) + ' does not stand.', p); continue; } x.u.rested = false; } for (const c of this.P(p).orderZone) c.rested = false;
           this.phase = 'draw'; this.draw(p, 1);
           this.phase = 'ride';
           if (this.P(p).crest.length) this.energyCharge(p, 3);
@@ -6182,7 +6537,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
       const pl = this.P(p); const g = this.vgGrade(p); const acts = [];
       for (const c of pl.hand) {
         const d = this.def(c);
-        if (d.type === 'unit' && d.grade <= g) {
+        if (d.type === 'unit' && d.grade <= g && this.mateOk(p, d)) {
           for (const circ of RCS) if (!(d.backRowOnly && ['FL', 'FR'].includes(circ))) acts.push({ key: 'call:' + c.iid + ':' + circ, kind: 'call', iid: c.iid, id: c.id, circ, label: 'Call ' + d.name + ' → ' + CIRC_PT[circ] });
           if (d.overDress) for (const circ of RCS) {
             const u = pl.rc[circ];
@@ -6281,6 +6636,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
       if (d.order === 'blitz' && this.battle) this.battle.blitzPlayed = true;
       const fromDrop = !pl.hand.includes(c) && pl.drop.includes(c) && c.playFromDrop === this.turn;
       this.take(fromDrop ? pl.drop : pl.hand, c); this.tf.orderPlayed[p] = true; this.tf.orderThisTurn[p] = true; pl.trig.push(c);
+      if (d.ultimate) (this.tf.ultimatePlayed || (this.tf.ultimatePlayed = [false, false]))[p] = true;
       if (d.order === 'normal') (this.tf.normalOrderPlayed || (this.tf.normalOrderPlayed = [false, false]))[p] = true;
       if (d.magazine) (this.tf.magazinePlayed || (this.tf.magazinePlayed = [false, false]))[p] = true;
       // Alchemagic: combine with a normal order of a different name from the drop
@@ -6389,7 +6745,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
     guardActions(d) {
       const b = this.battle; const pl = this.P(d); const acts = [];
       const noSent = this.tf.noSentinel && this.tf.noSentinel[d];
-      const units = b.noHandGuard ? [] : pl.hand.filter(c => this.def(c).type === 'unit' && !(noSent && this.def(c).sentinel) && (b.guardMaxGrade == null || this.def(c).grade <= b.guardMaxGrade));
+      const units = b.noHandGuard ? [] : pl.hand.filter(c => this.def(c).type === 'unit' && !(noSent && this.def(c).sentinel) && this.mateOk(d, this.def(c)) && (b.guardMaxGrade == null || this.def(c).grade <= b.guardMaxGrade));
       if (b.multiGuard && !b.handGuarded) {
         const need = b.multiGuardMin || 2;
         const pool = b.multiGuardDiffGrades ? units.filter(c => !this.def(c).sentinel) : units;
@@ -6439,7 +6795,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
       atkEvs.push(['unitAttacked', {}], ['allyAttacks', {}]);
       if (this.battle.bUnit) atkEvs.push(['boost', {}], ['boosted', {}]);
       yield* this.fireAll(atkEvs);
-      if (this.circOf(p, aUnit)) yield* this.fire('guardStepStart', {});
+      if (this.circOf(p, aUnit)) yield* this.fireAll([['guardStepStart', {}], ['guardStepDef', {}]]);
       // guard step
       if (this.circOf(p, aUnit) && this.liveTargets().length) {
         for (let k = 0; k < 60; k++) {
@@ -6760,6 +7116,10 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
       if (n === 'Dragon Knight, Nehalem' && g.turn > 2) return a.key;
       if ((n === 'Stealth Dragon, Kizanreiji' || n === 'Strong Fortress Dragon, Gibrabrachio') && g.rearguards(o).length >= 1) return a.key;
       if (n === 'Bizarre Beast, Bagumotor') return a.key;
+      if (n === 'Blast' && g.rearguards(p).filter(r => r.u.c.token && r.u.c.id !== 'TOKEN/BLAST').length + (g.emptyRC(p).length <= 1 ? 1 : 0) >= 2) return a.key;
+      if (n === 'Legend of the Celestial Fury, Estacion') return a.key;
+      if (n === 'Lusdiana of Sunny Spring' && pl.energy >= 6) return a.key;
+      if (n === 'Burrow Mushrooms' && g.emptyRC(p).length >= 2) return a.key;
       if (n === 'Courteous Supporter' && pl.hand.length >= 3 && pl.orderZone.filter(x => g.def(x).arena).length < 3) return a.key;
       if (n === 'Diabolos Edge, Grantory' && g.rearguards(o).some(r => ['FL', 'FR'].includes(r.circ))) return a.key;
       if (n === 'Steam Knight, Pashatatal' && g.turn > 2 && pl.soul.length <= 4) return a.key;
@@ -6800,6 +7160,8 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
         case 'Moment of Capture! Aurora Battle Princess 24-hr Coverage!': return a.key;
         case 'Horns of Blessing': return a.key;
         case 'Harmonious Off-Shot': if (new Set(g.rearguards(p).map(r => g.name(r.u.c))).size >= 3) return a.key; break;
+        case 'Blazing Star Cross': if (g.units(p).some(s => /Ezerwur/.test(g.name(s.u.c)))) return a.key; break;
+        case 'Vital Blaze Blast': if (g.emptyRC(p).length >= 1) return a.key; break;
         case 'Wild Intelligence': if (fu >= 1 && g.emptyRC(p).length >= 1) return a.key; break;
         case 'Harvesting Season': if (g.phase === 'main' && ['BL', 'BC', 'BR'].filter(c => g.unitAt(p, c) && (g.unitAt(p, c).mods.some(m => m.backAttack) || g.contFlag(p, c, g.unitAt(p, c), 'interceptBack'))).length >= 1) return a.key; break;
         case 'Overcoming the Unnatural Death': if (fu >= 2 && pl.drop.filter(x => g.def(x).type === 'order').length >= 2) return a.key; break;
@@ -7371,7 +7733,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
       const cr = G.crit(p, c);
       inner = (u.faceDown ? cardHTML(null) : cardHTML(u.c.id)) +
         (u.faceDown ? '' : '<span class="badge pw' + (pw > base ? ' up' : '') + '">' + fmt(pw) + '</span>') +
-        (cr > 1 ? '<span class="badge cr">★' + cr + '</span>' : '') + (u.od ? '<span class="badge od">OD</span>' : '');
+        (cr > 1 ? '<span class="badge cr">★' + cr + '</span>' : '') + (u.od ? '<span class="badge od">OD</span>' : '') + (u.c.id === 'TOKEN/BLAST' ? '<span class="badge od" title="Plant gauge">⚘' + (u.under.length + (u.tgauge || 0)) + '</span>' : '');
     }
     return '<div class="' + cls.join(' ') + '" data-p="' + p + '" data-c="' + c + '" role="button" tabindex="0" aria-label="' + esc((u ? G.name(u.c) : 'empty') + ' ' + CIRC_PT[c]) + '">' + inner + '</div>';
   }
