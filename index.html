@@ -153,7 +153,7 @@ input[type="checkbox"] { accent-color: var(--gold); width: 18px; height: 18px; }
 
 /* circles: rounded slots sitting on ring sigils; the vanguard circle glows */
 .circ { position: relative; aspect-ratio: 63 / 88; border-radius: var(--r-slot); border: 1.5px solid var(--line); display: grid; place-items: center; font-size: 10px;
-  color: rgba(162, 169, 214, .55); height: clamp(52px, calc((100cqh - 110px) / 4), 210px); justify-self: center; font-family: var(--f-display); font-weight: 600;
+  color: rgba(162, 169, 214, .55); height: clamp(52px, calc((100cqh - 110px) / 4), 210px); max-width: 100%; justify-self: center; font-family: var(--f-display); font-weight: 600;
   background: radial-gradient(circle at 50% 50%, transparent 31%, rgba(150, 165, 255, .14) 32% 34%, transparent 35%), rgba(20, 26, 60, .55); transition: border-color .15s, box-shadow .15s; }
 .circ.vc { border-color: rgba(240, 195, 90, .5);
   background: radial-gradient(circle at 50% 50%, transparent 30%, rgba(240, 195, 90, .35) 31% 33%, transparent 34% 39%, rgba(240, 195, 90, .18) 40% 41%, transparent 42%), rgba(40, 34, 40, .45);
@@ -194,7 +194,7 @@ button.zone:hover { border-color: var(--line-2); }
 .dock { background: linear-gradient(180deg, rgba(12, 15, 39, 0), rgba(12, 15, 39, .9) 30%); }
 .actionbar { display: flex; gap: 8px; align-items: center; padding: 8px 12px; flex-wrap: wrap; min-height: 52px; }
 .actionbar .hint { flex: 1 1 160px; font-size: 13px; color: var(--ink-dim); min-width: 0; }
-@media (max-width: 1099px) {
+@media (max-width: 899px) {
   .actionbar { padding: 6px 10px; gap: 6px; min-height: 0; }
   .actionbar .hint { flex-basis: 100%; font-size: 12px; line-height: 1.35; }
   .actionbar .btn { padding: 8px 14px; font-size: 13px; }
@@ -224,14 +224,27 @@ button.zone:hover { border-color: var(--line-2); }
 .logp p { margin: 0 0 4px; } .logp p.p0 { color: var(--ink); } .logp p.p1 { color: #ffb3bd; } .logp p.sys { color: var(--gold); }
 
 /* desktop: the inspector sits beside the playmat */
-@media (min-width: 1100px) {
-  .arena { grid-template-columns: minmax(0, 1fr) 340px; gap: 12px; padding-right: 12px; }
+@media (min-width: 900px) {
+  .game { --insp: clamp(280px, 24vw, 380px); --hand-h: clamp(96px, 19vh, 170px); }
+  .gbar { padding: 6px 16px; }
+  .arena { grid-template-columns: minmax(0, 1fr) var(--insp); gap: 12px; padding-right: 12px; }
+  /* the zone counters sit in a compact two-column block so they never make a side taller than its field */
+  .rail { min-width: 0; gap: 4px; align-content: center; }
+  .rail .zones { grid-template-columns: repeat(2, minmax(78px, auto)); gap: 4px; }
+  .zone { padding: 2px 9px; font-size: 11px; line-height: 1.5; }
+  .who-tag { padding: 1px 8px; font-size: 11px; }
+  .opphand { min-height: 14px; }
+  .opphand > div { width: 14px !important; }
+  .mid { min-height: 28px; }
+  .gamelegal { font-size: 9px; margin: 0; }
+  .side { grid-template-columns: auto auto; justify-content: center; gap: 28px; max-width: none; }
+  .circ { height: clamp(52px, calc((100cqh - 96px) / 4), 220px); }
   .logbtn { display: none; }
   .table { padding: 8px 16px; }
   .side { max-width: 720px; }
   .fieldgrid { max-width: none; width: auto; gap: 12px; grid-template-columns: repeat(3, auto); justify-content: center; }
   .circ { width: auto; }
-  .circ .card { font-size: clamp(9px, 1vw, 14px); }
+  .circ .card { font-size: clamp(7px, calc((100cqh - 92px) / 4 * .095), 14px); }
   .inspector { display: flex; flex-direction: column; gap: 12px; min-height: 0; padding: 4px 0 12px; }
   .detail { position: static; display: flex; flex-direction: column; gap: 12px; max-height: none; flex: 1 1 auto; min-height: 0; overflow: auto; background: linear-gradient(180deg, var(--mat-2), var(--mat)); border-color: var(--line); border-radius: var(--r-panel); padding: 16px; }
   .detail .dcard { width: 168px; margin: 0 auto; flex: 0 0 auto; }
@@ -244,14 +257,34 @@ button.zone:hover { border-color: var(--line-2); }
   .logwrap { display: flex; flex-direction: column; min-height: 150px; flex: 0 0 190px; border-radius: var(--r-panel); background: rgba(20, 26, 60, .6); border: 1px solid var(--line); padding: 12px 14px; overflow: hidden; }
   .logwrap h3 { font-size: 13px; color: var(--ink-dim); font-weight: 600; margin-bottom: 6px; }
   .logwrap .logp { overflow: auto; min-height: 0; flex: 1; }
-  .dock { display: grid; grid-template-columns: minmax(0, 1fr); }
-  .actionbar { order: 2; padding: 6px 16px 12px; }
-  .handbar { order: 1; justify-content: center; overflow: visible; padding: 6px 16px 0; min-height: 150px; }
-  .handbar .hc { width: 96px; margin-left: -22px; transform: translateY(var(--lift, 0px)) rotate(calc((var(--i) - (var(--n) - 1) / 2) * 2.2deg)); transform-origin: 50% 120%; }
+  /* dock: the hand under the playmat, the action buttons under the card panel, on one row */
+  .dock { display: grid; grid-template-columns: minmax(0, 1fr) var(--insp); gap: 12px; padding-right: 12px; align-items: end; }
+  .actionbar { grid-column: 2; grid-row: 1; padding: 0 0 12px; align-content: flex-end; justify-content: flex-end; min-height: 0; }
+  .actionbar .hint { flex: 1 1 100%; font-size: 12px; line-height: 1.4; }
+  .actionbar .btn { padding: 9px 16px; font-size: 14px; }
+  .handbar { grid-column: 1; grid-row: 1; justify-content: center; overflow: visible; padding: 4px 16px 8px; min-height: calc(var(--hand-h) + 12px); }
+  .handbar { container-type: inline-size; gap: 0; }
+  .handbar .hc { --w: calc(var(--hand-h) * .68); width: var(--w); margin-left: min(calc(var(--hand-h) * -.16), calc((100cqw - 40px - var(--w)) / max(1, var(--n) - 1) - var(--w))); transform: translateY(var(--lift, 0px)) rotate(calc((var(--i) - (var(--n) - 1) / 2) * min(2.2deg, calc(18deg / var(--n))))); transform-origin: 50% 120%; }
   .handbar .hc:first-child { margin-left: 0; }
   .handbar .hc:hover { --lift: -18px; z-index: 3; }
   .handbar .hc.sel { z-index: 4; transform: translateY(-22px) rotate(0deg); }
-  .handbar .hc .card { font-size: 12px; }
+  .handbar .hc .card { font-size: clamp(9px, calc(var(--hand-h) * .085), 13px); }
+  .detail .dcard { width: clamp(120px, 22vh, 190px); }
+}
+/* short desktop screens (laptops with display scaling): card picture beside the text, smaller log */
+@media (min-width: 900px) and (max-height: 820px) {
+  .inspector { gap: 8px; padding-bottom: 8px; }
+  /* picture and name side by side, rules text across the full width below */
+  .detail { display: grid; grid-template-columns: minmax(0, 34%) minmax(0, 1fr); align-content: start; align-items: start; column-gap: 12px; row-gap: 4px; padding: 12px; }
+  .detail .txt { display: contents; }
+  .detail .dcard { width: 100%; grid-row: span 3; }
+  .detail .dcard .card { font-size: 10px; }
+  .detail h3 { font-size: 16px; grid-column: 2; }
+  .detail .dstats, .detail .dset { grid-column: 2; }
+  .detail .dtext, .detail .acts, .detail .txt > p.muted { grid-column: 1 / -1; }
+  .detail .dtext { font-size: 13px; line-height: 1.45; margin-top: 6px; }
+  .logwrap { flex: 0 0 120px; min-height: 0; padding: 8px 12px; }
+  .ihint { padding: 10px 12px; }
 }
 
 /* sheet */
@@ -7536,7 +7569,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
     }
   });
   // pointer devices: hovering a card previews it in the side inspector
-  const canHover = window.matchMedia('(hover: hover) and (min-width: 1100px)');
+  const canHover = window.matchMedia('(hover: hover) and (min-width: 900px)');
   $('#game').addEventListener('mouseover', e => {
     if (!G || !canHover.matches || ui.sel) return;
     const hc = e.target.closest('.hc'); const ci = e.target.closest('.circ');
