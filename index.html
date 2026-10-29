@@ -2548,11 +2548,11 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
       this.lastSoulBlasted = chosen;
       this.log(this.names[p] + ': Soul-Blast ' + n + '.', p);
     }
-    *discard(p, n, title, exclude) {
+    *discard(p, n, title, exclude, o) {
       const pl = this.P(p); const pool = pl.hand.filter(c => !exclude || !exclude.includes(c));
       const chosen = yield* this.selectCards(p, pool, { title: title || ('Discard ' + n + ' card(s)'), min: n, max: n, purpose: 'discard' });
       for (const c of chosen) { this.take(pl.hand, c); pl.drop.push(c); this.log(this.names[p] + ' discards ' + this.name(c) + '.', p); }
-      for (const c of chosen) if (pl.drop.includes(c)) yield* this.fire('discarded', { p, card: c });
+      if (!(o && o.noFire)) for (const c of chosen) if (pl.drop.includes(c)) yield* this.fire('discarded', { p, card: c });
       return chosen;
     }
     canPay(p, cost, exclude, ctx) {
@@ -2923,9 +2923,13 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
       if (o.kind === 'skip') return;
       const pl = this.P(p);
       if (o.kind === 'rideDeck') {
-        if (!o.free) { this.tf.rideCost = true; try { yield* this.discard(p, 1, 'Ride Deck: discard 1 card'); } finally { this.tf.rideCost = false; } }
+        // the discard is the cost; abilities it triggers resolve after the ride, so the Energy Generator
+        // has already been placed (and charged, if you went second) when they resolve
+        const paid = o.free ? [] : yield* this.discard(p, 1, 'Ride Deck: discard 1 card', null, { noFire: true });
         const c = pl.rideDeck.find(x => x.iid === o.iid); this.take(pl.rideDeck, c);
         yield* this.ride(p, c, true);
+        this.tf.rideCost = true;
+        try { for (const d of paid) if (pl.drop.includes(d)) yield* this.fire('discarded', { p, card: d }); } finally { this.tf.rideCost = false; }
       } else {
         const c = pl.hand.find(x => x.iid === o.iid); this.take(pl.hand, c);
         yield* this.ride(p, c, false);
