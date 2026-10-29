@@ -33,6 +33,7 @@
   --ds-a: #6b2f8f; --ds-b: #c9a2e8;
   --bg-a: #3d5560; --bg-b: #8fd6e0;
   --st-a: #2f7a4a; --st-b: #b9e39a;
+  --lm-a: #8a2f78; --lm-b: #ffb6e1;
   --nn-a: #5b3aa6; --nn-b: #d8a6ff;
   --f-display: "Oxanium", "Trebuchet MS", system-ui, sans-serif;
   --f-body: "Figtree", "Segoe UI", system-ui, sans-serif;
@@ -109,6 +110,7 @@ input[type="checkbox"] { accent-color: var(--gold); width: 18px; height: 18px; }
 .card.n-DS { --a: var(--ds-a); --b: var(--ds-b); }
 .card.n-BG { --a: var(--bg-a); --b: var(--bg-b); }
 .card.n-ST { --a: var(--st-a); --b: var(--st-b); }
+.card.n-LM { --a: var(--lm-a); --b: var(--lm-b); }
 .card .art { position: absolute; inset: 15% 8% 30%; border-radius: 6px; background:
   radial-gradient(circle at 50% 40%, rgba(255,255,255,.35), transparent 55%), repeating-linear-gradient(135deg, rgba(255,255,255,.07) 0 6px, transparent 6px 12px); display: grid; place-items: center; overflow: hidden; }
 .card .art img { width: 100%; height: 100%; object-fit: cover; }
@@ -417,7 +419,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
   <div class="builder">
     <section class="stack">
       <div class="row" id="b-filter" role="group" aria-label="Filter by nation">
-        <button class="btn small" data-f="all">All</button><button class="btn small" data-f="DE">Dragon Empire</button><button class="btn small" data-f="DS">Dark States</button><button class="btn small" data-f="BG">Brandt Gate</button><button class="btn small" data-f="KS">Keter Sanctuary</button><button class="btn small" data-f="ST">Stoicheia</button><button class="btn small" data-f="NN">Nationless</button>
+        <button class="btn small" data-f="all">All</button><button class="btn small" data-f="DE">Dragon Empire</button><button class="btn small" data-f="DS">Dark States</button><button class="btn small" data-f="BG">Brandt Gate</button><button class="btn small" data-f="KS">Keter Sanctuary</button><button class="btn small" data-f="ST">Stoicheia</button><button class="btn small" data-f="LM">Lyrical Monasterio</button><button class="btn small" data-f="NN">Nationless</button>
       </div>
       <div class="field-row"><label class="label" for="b-q">Search cards</label><input id="b-q" type="search" placeholder="Card name"></div>
       <div class="pool" id="b-pool"></div>
@@ -442,7 +444,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
   <h2 style="margin-top:8px">Card pool</h2>
   <p class="muted">Every card here has its ability programmed in the engine. "Summarized text" means the ability summary still needs checking against the printed card; "short name" means only part of the printed name is known so far.</p>
   <div class="row" id="cards-filter" role="group" aria-label="Filter by nation">
-    <button class="btn small" data-f="all">All</button><button class="btn small" data-f="DE">Dragon Empire</button><button class="btn small" data-f="DS">Dark States</button><button class="btn small" data-f="BG">Brandt Gate</button><button class="btn small" data-f="KS">Keter Sanctuary</button><button class="btn small" data-f="ST">Stoicheia</button><button class="btn small" data-f="NN">Nationless</button>
+    <button class="btn small" data-f="all">All</button><button class="btn small" data-f="DE">Dragon Empire</button><button class="btn small" data-f="DS">Dark States</button><button class="btn small" data-f="BG">Brandt Gate</button><button class="btn small" data-f="KS">Keter Sanctuary</button><button class="btn small" data-f="ST">Stoicheia</button><button class="btn small" data-f="LM">Lyrical Monasterio</button><button class="btn small" data-f="NN">Nationless</button>
   </div>
   <div class="field-row" style="margin-top:10px;max-width:360px"><label class="label" for="cards-q">Search</label><input id="cards-q" type="search" placeholder="Card name"></div>
   <p class="muted" id="cards-count" style="margin:12px 0 0;font-size:13px"></p>
@@ -1698,7 +1700,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
 
 ;
 /* DZ-BT01 "Fated Clash" — card definitions for the simulator: Keter Sanctuary (Rezael), Dragon Empire (Varga Dragres), Dark States (Androld), Brandt Gate (Welstra "Blitz Arms"), Stoicheia (Lascaria Veleno),
-   the over trigger reprints and the nationless Spiritual King of Ignition, Valnout.
+   Lyrical Monasterio (Krysrain), the over trigger reprints, the nationless Elemental triggers and the Spiritual Kings Valnout and Idosfaro.
    Rules text is a short summary written for this simulator, not the printed wording.
    verified:false = the ability summary still needs checking against the printed card. */
 (function (root) {
@@ -2731,6 +2733,142 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
       }
     });
 
+    /* ======================= Lyrical Monasterio ======================= */
+    const LM = 'Lyrical Monasterio';
+    const krysrain = (g, x) => vgNamed(g, x.p, 'Krysrain');
+    const distinctNames = (g, p) => new Set(g.units(p).map(s => g.name(s.u.c))).size;
+
+    add['016'] = U('016', 'Fated One of Ever-changing, Krysrain', LM, 3, {
+      race: 'Mermaid',
+      text: '[ACT](VC)[1/turn]: [COST: CB1], choose one: draw 1 and Energy-Charge 3; or choose one of your units, it gets +15000 until end of turn; or this unit gets critical +1 until end of turn. If you have four or more units with different card names, choose two instead; if five or more, perform all.\n' +
+        '[Divine Skill] - [AUTO](VC): At the end of the battle this unit attacked a grade 3 or greater unit, [COST: return all of your rear-guards to hand], choose up to one unit from your hand, call it to (RC), and until end of turn its power and critical become the same as this unit\'s.\n(Divine Skills can be used only once per fight among all your cards.)',
+      abilities: [
+        { kind: 'ACT', zones: ['VC'], oncePerTurn: true, label: 'Choose modes', cost: { cb: 1 },
+          resolve: function* (g, x) {
+            const n = distinctNames(g, x.p); const k = n >= 5 ? 3 : n >= 4 ? 2 : 1;
+            const modes = [{ key: 'draw', label: 'Draw 1 and Energy-Charge 3' }, { key: 'power', label: 'One of your units +15000' }, { key: 'crit', label: 'This unit critical +1' }];
+            let picked = modes.map(m => m.key);
+            if (k < 3) { const ans = yield { type: 'select', player: x.p, title: 'Krysrain: choose ' + k + ' mode' + (k > 1 ? 's' : ''), items: modes, min: k, max: k, purpose: 'mode' }; picked = g._validKeys(ans, modes, k, k); }
+            if (picked.includes('draw')) { g.draw(x.p, 1); g.energyCharge(x.p, 3); }
+            if (picked.includes('power')) yield* g.buff(x.p, { power: 15000, until: 'turn', title: 'Krysrain: +15000 to which unit?' });
+            if (picked.includes('crit') && g.circOf(x.p, x.unit)) { g.addMod(x.unit, { crit: 1, until: 'turn' }); g.log(g.name(x.unit.c) + ' critical +1.', x.p); }
+          } },
+        { kind: 'AUTO', on: 'battleEndVC', zones: ['VC'], divine: true, label: 'Rear-guards to hand, call a copy of this unit\'s stats', cost: { allRGToHand: true },
+          cond: (g, x) => g.battle && g.battle.targets.some(u => g.def(u.c).grade >= 3) && g.P(x.p).hand.concat(g.rearguards(x.p).map(r => r.u.c)).some(c => isUnit(g, c)),
+          resolve: function* (g, x) {
+            const pl = g.P(x.p);
+            const cs = yield* g.selectCards(x.p, pl.hand.filter(c => isUnit(g, c) && g.def(c).grade <= g.vgGrade(x.p)), { title: 'Krysrain: call up to one unit (it copies this unit\'s power and critical)', min: 0, max: 1, purpose: 'callFromHand' });
+            for (const c of cs) {
+              const u = yield* g.callFrom(x.p, c, 'hand', { from: 'hand' }); if (!u) continue;
+              const circ = g.circOf(x.p, u); if (!circ) continue;
+              const dp = g.power(x.p, 'VC') - g.power(x.p, circ), dc = g.crit(x.p, 'VC') - g.crit(x.p, circ);
+              g.addMod(u, { power: dp, crit: dc, until: 'turn' });
+              g.log(g.name(u.c) + ' now has ' + g.power(x.p, circ) / 1000 + 'k power and critical ' + g.crit(x.p, circ) + '.', x.p);
+            }
+          } }
+      ]
+    });
+    add['017'] = U('017', 'Innocent Orange, Annes', LM, 2, {
+      race: 'Mermaid',
+      text: '[AUTO](RC): When this unit is placed, if you have a grade 3 or greater vanguard with "Krysrain" in its card name, [COST: CB1 & EB3], look at the top five cards of your deck, choose up to one unit with a different card name from all of your units, call it to (RC), and shuffle your deck.\n[AUTO](RC): When this unit attacks a grade 3 or greater unit, if you have four or more units with different card names, this unit gets +10000 until end of that battle.',
+      abilities: [
+        { kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'Look at the top five, call a new name', cost: { cb: 1, eb: 3 }, cond: krysrain,
+          resolve: function* (g, x) {
+            const names = g.units(x.p).map(s => g.name(s.u.c));
+            yield* lookTop(g, x.p, 5, { title: 'Annes: call up to one unit with a new card name', pick: c => isUnit(g, c) && g.def(c).grade <= g.vgGrade(x.p) && !names.includes(g.name(c)), shuffle: true,
+              take: function* (c) { yield* callFromTrig(g, x.p, c); } });
+          } },
+        { kind: 'AUTO', on: 'attack', zones: ['RC'], label: 'This unit +10000', cond: (g, x) => g.battle && g.battle.targets.some(u => g.def(u.c).grade >= 3) && distinctNames(g, x.p) >= 4,
+          resolve: function* (g, x) { g.addMod(x.unit, { power: 10000, until: 'battle' }); g.log(g.name(x.unit.c) + ' +10000.', x.p); } }
+      ]
+    });
+    add['018'] = U('018', 'Dazzle Bubble Paradise, Precia', LM, 2, {
+      race: 'Human',
+      text: cycleText + '\n[AUTO](RC): When this unit is placed, if you persona rode this turn, [COST: CB1 or EB3], choose one of your units, and it gets +5000 until end of turn. If you chose a rear-guard, return it to your hand at the end of that turn.',
+      abilities: cycleAbs.concat([
+        { kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'A unit +5000', cost: { alt: [{ cb: 1 }, { eb: 3 }] }, cond: (g, x) => g.tf.persona[x.p],
+          resolve: function* (g, x) {
+            const u = yield* g.buff(x.p, { power: 5000, until: 'turn', title: 'Precia: +5000 to which unit? (a rear-guard returns to hand at end of turn)' });
+            if (u && g.circOf(x.p, u) !== 'VC') (g.tf.endTurnHand || (g.tf.endTurnHand = [])).push(u);
+          } }
+      ])
+    });
+    add['049'] = U('049', 'Sharing "Happiness", Felilina', LM, 1, {
+      race: 'Dragoroid',
+      text: '[AUTO](RC): When this unit boosts a rear-guard, if you persona rode this turn, [COST: CB1 & SB1], choose your vanguard, and until end of turn it gets "[CONT](VC): Your rear-guards get +5000." At the end of that battle, put this unit on the bottom of your deck.',
+      abilities: [{ kind: 'AUTO', on: 'boost', zones: ['RC'], label: 'Your rear-guards +5000 this turn', cost: { cb: 1, sb: 1 },
+        cond: (g, x) => g.tf.persona[x.p] && g.battle && g.battle.aUnit !== g.P(x.p).vc,
+        resolve: function* (g, x) {
+          const vc = g.P(x.p).vc;
+          g.grant(vc, { kind: 'CONT', zones: ['VC'], power: (gg, xx) => xx.target !== 'VC' ? 5000 : 0 }, 'turn');
+          g.log('Your rear-guards get +5000 this turn.', x.p);
+          g.grant(x.unit, { kind: 'AUTO', on: 'boostEnd', zones: ['RC'], label: 'Put this unit on the bottom of the deck',
+            resolve: function* (gg, xx) { const circ = gg.circOf(xx.p, xx.unit); if (circ) { gg.removeUnit(xx.p, circ, 'bottom'); gg.log(gg.name(xx.unit.c) + ' goes to the bottom of the deck.', xx.p); } } }, 'battle');
+        } }]
+    });
+    add['050'] = U('050', 'Cynical Composer, Raum', LM, 1, {
+      race: 'Demon',
+      text: '[CONT](RC): During the battle this unit boosted, if you have a grade 3 or greater vanguard with "Krysrain" in its card name, this unit gets +5000.\n[AUTO](RC): When this unit boosts a grade 3 or greater vanguard with "Krysrain" in its card name, if you have four or more units with different card names, [COST: EB3], until end of that battle, your opponent must call three or more cards of different grades at the same time to call cards other than Sentinels from hand to (GC).',
+      abilities: [
+        { kind: 'CONT', zones: ['RC'], power: selfPower(5000, (g, x) => krysrain(g, x) && g.battle && g.battle.bUnit === x.unit) },
+        { kind: 'AUTO', on: 'boost', zones: ['RC'], label: 'Opponent must guard with three different grades', cost: { eb: 3 },
+          cond: (g, x) => g.battle && g.battle.aUnit === g.P(x.p).vc && krysrain(g, x) && distinctNames(g, x.p) >= 4,
+          resolve: function* (g, x) { g.battle.multiGuard = 'Raum'; g.battle.multiGuardMin = 3; g.battle.multiGuardDiffGrades = true; g.log('Your opponent must guard with three or more cards of different grades this battle.', x.p); } }
+      ]
+    });
+    add['071'] = U('071', 'Vivid Flash, Weasmay', LM, 3, {
+      race: 'Warbeast',
+      text: '[AUTO](RC): When this unit attacks a grade 3 or greater unit, if you have a grade 3 or greater vanguard with "Krysrain" in its card name, [COST: CB1], this unit gets +15000 until end of that battle.',
+      abilities: [{ kind: 'AUTO', on: 'attack', zones: ['RC'], label: 'This unit +15000', cost: { cb: 1 }, cond: (g, x) => krysrain(g, x) && g.battle && g.battle.targets.some(u => g.def(u.c).grade >= 3),
+        resolve: function* (g, x) { g.addMod(x.unit, { power: 15000, until: 'battle' }); g.log(g.name(x.unit.c) + ' +15000.', x.p); } }]
+    });
+    add['141'] = ORD('141', 'Harmonious Off-Shot', LM, 2, 'normal', {
+      race: 'Mermaid', cost: { eb: 2 },
+      text: 'Normal Order. [COST: EB2] Choose three of your rear-guards with different card names; they get +5000 until end of turn.',
+      canPlay: (g, x) => new Set(g.rearguards(x.p).map(r => g.name(r.u.c))).size >= 3,
+      play: function* (g, x) {
+        const chosen = [];
+        for (let i = 0; i < 3; i++) {
+          const circ = yield* g.chooseUnit(x.p, { rearOnly: true, filter: s => !chosen.includes(s.u) && !chosen.some(u => g.name(u.c) === g.name(s.u.c)), title: 'Harmonious Off-Shot: choose a rear-guard (' + (i + 1) + ' of 3)', purpose: 'power', alwaysAsk: true });
+          if (!circ) break; chosen.push(g.unitAt(x.p, circ));
+        }
+        for (const u of chosen) { g.addMod(u, { power: 5000, until: 'turn' }); g.log(g.name(u.c) + ' +5000.', x.p); }
+      }
+    });
+    add['142'] = ORD('142', 'Fleeting Stars Upon this Night', LM, 2, 'blitz', {
+      race: 'Abyss Dragon', cost: { eb: 2 }, verified: false,
+      text: 'Blitz Order. [COST: EB2] If one or more of your rear-guards were moved from (RC) by your opponent\'s card effects this turn, choose one of your attacked units; it gets +25000 until end of that battle.',
+      canPlay: (g, x) => !!g.battle && g.battle.tp === x.p && !!(g.tf.lostRG && g.tf.lostRG[x.p]),
+      play: function* (g, x) {
+        const ts = g.liveTargets(); let u = ts[0];
+        if (ts.length > 1) { const circ = yield* g.chooseUnit(x.p, { filter: s => ts.includes(s.u), title: 'Choose an attacked unit: +25000', purpose: 'defend', alwaysAsk: true }); u = circ ? g.unitAt(x.p, circ) : ts[0]; }
+        if (u) { g.addMod(u, { power: 25000, until: 'battle' }); g.log(g.name(u.c) + ' +25000.', x.p); }
+      }
+    });
+
+    /* ======================= nationless Elemental triggers ======================= */
+    const TRIG_TEXT = {
+      crit: 'Critical Trigger: one unit gets critical +1 and one unit gets +10000 until end of turn.',
+      draw: 'Draw Trigger: draw 1, and one unit gets +10000 until end of turn.',
+      front: 'Front Trigger: all your front row units get +10000 until end of turn.',
+      heal: 'Heal Trigger (max 4): one unit gets +10000; if your damage is equal to or greater than your opponent\'s, heal 1.'
+    };
+    const ET = (no, name, trigger) => ({ set: S, no, name, nation: undefined, grade: 0, type: 'unit', power: 5000, shield: trigger === 'draw' ? 5000 : 15000, skill: 'boost', crit: 1, trigger, race: 'Elemental', abilities: [], verified: true, text: TRIG_TEXT[trigger] + '\n(Nationless: can be used in a deck of any nation.)' });
+    add['143'] = ET('143', 'Light Elemental, Pachiri', 'crit');
+    add['144'] = ET('144', 'Earth Elemental, Garara', 'draw');
+    add['145'] = ET('145', 'Heat Elemental, Marg', 'front');
+    add['146'] = ET('146', 'Wood Elemental, Leafy', 'heal');
+    add['026'] = {
+      set: S, no: '026', name: 'Spiritual King of Aquatics, Idosfaro', nation: undefined, grade: 0, type: 'unit', power: 5000, shield: 50000, skill: 'boost', crit: 1, trigger: 'over', race: 'Elemental', abilities: [], verified: true,
+      text: 'Over Trigger (max 1 per deck): remove this card, draw 1, and one of your units gets +100 million until end of turn.\nDrive check additional effect: choose a card from your drop and put it into your hand, then choose one of your units, and it gets critical +1 until end of turn.',
+      overExtra: function* (g, x) {
+        const pl = g.P(x.p);
+        const cs = yield* g.chooseFromZone(x.p, 'drop', { title: 'Idosfaro: put a card from your drop into your hand', min: 1, max: 1, purpose: 'fromDrop' });
+        for (const c of cs) { g.take(pl.drop, c); pl.hand.push(c); g.log(g.name(c) + ' returns to hand.', x.p); }
+        yield* g.buff(x.p, { crit: 1, until: 'turn', purpose: 'crit', title: 'Idosfaro: critical +1 to which unit?' });
+      }
+    };
+
     /* ======================= over triggers (reprints of D-BT01) and nationless ======================= */
     add['019'] = reissue('D-BT01/013', '019');
     add['020'] = reissue('D-BT01/016', '020');
@@ -3352,6 +3490,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
       if (cost.otherFrontToSoul) t.push('another front row rear-guard into soul');
       if (cost.sc) t.push('Soul-Charge ' + cost.sc);
       if (cost.bindSelfRC) t.push('bind this unit');
+      if (cost.allRGToHand) t.push('return all your rear-guards to hand');
       if (cost.selfToSoul) t.push('this unit into soul');
       if (cost.retireSelf) t.push('retire this unit');
       if (cost.restSelf) t.push('rest this unit');
@@ -3420,6 +3559,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
         const circ = yield* this.chooseUnit(p, { rearOnly: true, filter: x => x.u !== self, title: 'Cost: put a rear-guard into your soul', purpose: 'costSoul' });
         if (circ) { const u = this.unitAt(p, circ); this.log(this.name(u.c) + ' goes into the soul.', p); this.removeUnit(p, circ, 'soul'); if (!u.c.token) yield* this.fire('toSoulFromRC', { p, card: u.c }); }
       }
+      if (cost.allRGToHand) for (const x of this.rearguards(p)) { this.log(this.name(x.u.c) + ' returns to hand.', p); this.removeUnit(p, x.circ, 'hand'); }
       if (cost.retireRG) for (let i = 0; i < cost.retireRG; i++) {
         const circ = yield* this.chooseUnit(p, { rearOnly: true, title: 'Cost: retire one of your rear-guards', purpose: 'costRetire' });
         if (circ) this.retire(p, circ, 'cost');
@@ -3494,6 +3634,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
       const u = this.unitAt(p, circ); if (!u) return;
       if (circ !== 'VC' && !['attack', 'cost', 'replaced', 'rule'].includes(why) && this.retireImmune(p, circ)) { this.log(this.name(u.c) + ' cannot be retired by card effects.', p); return; }
       const toHand = circ !== 'VC' && u.retireToHand === this.turn && !u.c.token;
+      if (circ !== 'VC' && this.active !== p && !['attack', 'cost', 'replaced', 'rule'].includes(why)) (this.tf.lostRG || (this.tf.lostRG = [false, false]))[p] = true;
       this.removeUnit(p, circ, toHand ? 'hand' : 'drop');
       this.log(this.name(u.c) + ' is retired' + (why ? ' (' + why + ')' : '') + (toHand ? ' and returns to hand' : '') + '.', p);
       if (circ !== 'VC') { this.tf.retired[p]++; (this.pendingRetired || (this.pendingRetired = [])).push(p); }
@@ -3690,6 +3831,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
           this.phase = 'main'; yield* this._mainPhase(p); this.pendingRetired = [];
           if (this.turn > 1) { this.phase = 'battle'; yield* this._battlePhase(p); }
           this.phase = 'end';
+          for (const u of this.tf.endTurnHand || []) { const pp = [0, 1].find(i => this.circOf(i, u)); if (pp != null) { this.log(this.name(u.c) + ' returns to hand.', pp); this.removeUnit(pp, this.circOf(pp, u), 'hand'); } }
           for (const u of this.tf.endTurnSoul) { const pp = [0, 1].find(i => this.circOf(i, u)); if (pp != null) { this.log(this.name(u.c) + ' goes into the soul.', pp); this.removeUnit(pp, this.circOf(pp, u), 'soul'); } }
           this.expire('battle'); this.expire('turn');
           this.active = 1 - p;
@@ -3944,7 +4086,11 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
       const b = this.battle; const pl = this.P(d); const acts = [];
       const units = pl.hand.filter(c => this.def(c).type === 'unit');
       if (b.multiGuard && !b.handGuarded) {
-        if (units.length >= 2) acts.push({ key: 'gm', kind: 'guardMulti', label: 'Guard with 2 or more cards (required by ' + b.multiGuard + ')' });
+        const need = b.multiGuardMin || 2;
+        const pool = b.multiGuardDiffGrades ? units.filter(c => !this.def(c).sentinel) : units;
+        const grades = new Set(pool.map(c => this.def(c).grade)).size;
+        if (pool.length >= need && (!b.multiGuardDiffGrades || grades >= need)) acts.push({ key: 'gm', kind: 'guardMulti', label: 'Guard with ' + need + ' or more cards' + (b.multiGuardDiffGrades ? ' of different grades' : '') + ' (required by ' + b.multiGuard + ')' });
+        if (b.multiGuardDiffGrades) for (const c of units.filter(c => this.def(c).sentinel)) acts.push({ key: 'g' + c.iid, kind: 'guard', iid: c.iid, id: c.id, shield: this.def(c).shield || 0, label: 'Guard with ' + this.name(c) + ' (' + (this.def(c).shield || 0) + ')' });
       } else for (const c of units) acts.push({ key: 'g' + c.iid, kind: 'guard', iid: c.iid, id: c.id, shield: this.def(c).shield || 0, label: 'Guard with ' + this.name(c) + ' (' + (this.def(c).shield || 0) + ')' });
       for (const c of pl.hand) {
         const od = this.def(c);
@@ -4001,7 +4147,14 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
           if (g.kind === 'guard' || g.kind === 'guardMulti') {
             let cs;
             if (g.kind === 'guard') cs = [pl.hand.find(x => x.iid === g.iid)];
-            else cs = yield* this.selectCards(o, pl.hand.filter(c => this.def(c).type === 'unit'), { title: 'Call 2 or more guardians at once', min: 2, max: 99, purpose: 'guardMulti' });
+            else if (this.battle.multiGuardDiffGrades) {
+              cs = []; const need = this.battle.multiGuardMin || 3;
+              for (let k = 0; k < 4; k++) {
+                const left = pl.hand.filter(c => this.def(c).type === 'unit' && !this.def(c).sentinel && !cs.includes(c) && !cs.some(x => this.def(x).grade === this.def(c).grade));
+                const pick = yield* this.selectCards(o, left, { title: 'Guardian ' + (cs.length + 1) + ' (all different grades, at least ' + need + ')', min: cs.length < need ? 1 : 0, max: 1, purpose: 'guardMulti' });
+                if (!pick.length) break; cs.push(pick[0]);
+              }
+            } else cs = yield* this.selectCards(o, pl.hand.filter(c => this.def(c).type === 'unit'), { title: 'Call ' + (this.battle.multiGuardMin || 2) + ' or more guardians at once', min: this.battle.multiGuardMin || 2, max: 99, purpose: 'guardMulti' });
             const forU = yield* this._guardFor(o);
             const placed = [];
             for (const c of cs) { this.take(pl.hand, c); const gu = { c, mods: [], owner: o, for: forU }; pl.gc.push(gu); placed.push(gu); }
@@ -4655,7 +4808,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
   const settings = Object.assign({ img: OFFICIAL_IMG, alwaysBoost: false, speed: 'normal' }, store.get('settings2', {}));
   if (settings.img === OLD_OFFICIAL) settings.img = OFFICIAL_IMG;
   const saveSettings = () => store.set('settings2', settings);
-  const NAT = { 'Dragon Empire': 'DE', 'Keter Sanctuary': 'KS', 'Dark States': 'DS', 'Brandt Gate': 'BG', 'Stoicheia': 'ST' };
+  const NAT = { 'Dragon Empire': 'DE', 'Keter Sanctuary': 'KS', 'Dark States': 'DS', 'Brandt Gate': 'BG', 'Stoicheia': 'ST', 'Lyrical Monasterio': 'LM' };
   const H = 0; // human seat
 
   /* ---------------- decks ---------------- */
