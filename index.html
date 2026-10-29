@@ -5420,6 +5420,884 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
   }
   if (typeof module !== 'undefined' && module.exports) module.exports = install; else root.VGCardsDZSS0910 = install;
 })(this);
+;
+/* DZ-BT03 "Dimensional Transcendence" — card definitions for the simulator: Dragon Empire (Kotihblaze, Shojodoji), Dark States (Sacrifice Glass / Grandogma, Venus Luquier),
+   Brandt Gate (Daiyusha, Arkhite), Keter Sanctuary (Mordalion and the undercover gauges) and Stoicheia (Stoeirhaja and Codex orders).
+   Rules text is a short summary written for this simulator from card listings, not the printed wording.
+   verified:false = the ability summary still needs checking against the printed card.
+   Abilities that need cards or mechanics the simulator does not have yet (Monsters in the order zone, Armed Arms, Researches, clan-only vanguards, ...) are shown as text only. */
+(function (root) {
+  'use strict';
+  function install(CARDS, H, DECKS) {
+    const KS = 'Keter Sanctuary', DE = 'Dragon Empire', DS = 'Dark States', BG = 'Brandt Gate', ST = 'Stoicheia';
+    const S = 'DZ-BT03';
+    const { firstVanguardDraw } = H;
+    const DEF = { 3: [13000, 0, 'twin'], 2: [10000, 5000, 'intercept'], 1: [8000, 5000, 'boost'], 0: [6000, 5000, 'boost'] };
+    const U = (no, name, nation, grade, o) => { const [power, shield, skill] = DEF[grade]; return Object.assign({ set: S, no, name, nation, grade, type: 'unit', power, shield, skill, crit: 1, persona: grade === 3, abilities: [], verified: true }, o); };
+    const ORD = (no, name, nation, grade, order, o) => Object.assign({ set: S, no, name, nation, grade, type: 'order', order, power: 0, shield: 0, crit: 0, abilities: [], verified: true }, o);
+    const reissue = (srcId, no, extra) => CARDS[srcId] ? Object.assign({}, CARDS[srcId], { set: S, no, id: undefined, reprintOf: srcId }, extra || {}) : null;
+    const G0TEXT = '[AUTO]: When this unit is rode upon, if you went second, draw 1.';
+    const NOT_AUTO = '\n(This ability needs cards or a mechanic the simulator does not have yet, so it does nothing here.)';
+    const fmt = n => n.toLocaleString('en-US');
+    const RCS = ['FL', 'FR', 'BL', 'BC', 'BR'], FRONT_RC = ['FL', 'FR'], BACK = ['BL', 'BC', 'BR'];
+    const COL = { FL: 'L', BL: 'L', VC: 'C', BC: 'C', FR: 'R', BR: 'R' };
+
+    /* ---------- helpers ---------- */
+    const opp = x => 1 - x.p;
+    const vgNamed = (g, p, part, minGrade) => { const vc = g.P(p).vc; return !!vc && g.def(vc.c).grade >= (minGrade == null ? 3 : minGrade) && g.name(vc.c).includes(part); };
+    const vgHas = (part, minGrade) => (g, x) => vgNamed(g, x.p, part, minGrade);
+    const isUnit = (g, c) => g.def(c).type === 'unit' && !c.token;
+    const isNormal = (g, c) => isUnit(g, c) && !g.def(c).trigger;
+    const myTurn = (g, x) => g.active === x.p;
+    const selfPower = (n, cond) => (g, x) => x.targetUnit === x.unit && (!cond || cond(g, x)) ? n : 0;
+    const oppVG3 = (g, x) => { const v = g.P(opp(x)).vc; return !!v && g.def(v.c).grade >= 3; };
+    const oppRGs = (g, x, f) => g.rearguards(opp(x)).filter(r => !g.def(r.u.c).untargetableRC && (!f || f(r)));
+    const setOrders = (g, p) => g.P(p).orderZone.filter(c => g.def(c).order === 'set').length;
+    const tfN = (g, k, p) => (g.tf[k] && g.tf[k][p]) || 0;
+    const plusBattle = (g, u, p, n) => { g.addMod(u, { power: n, until: 'battle' }); g.log(g.name(u.c) + ' +' + fmt(n) + '.', p); };
+    const plusTurn = (g, u, p, n) => { g.addMod(u, { power: n, until: 'turn' }); g.log(g.name(u.c) + ' +' + fmt(n) + '.', p); };
+    function* pickOne(g, p, title, opts) { const ans = yield { type: 'select', player: p, title, items: opts, min: 1, max: 1, purpose: 'mode' }; return g._validKeys(ans, opts, 1, 1)[0]; }
+    function* lookTop(g, p, n, o) {
+      const pl = g.P(p); const cs = pl.deck.splice(0, Math.min(n, pl.deck.length)); pl.trig.push(...cs);
+      if (cs.length) g.log(g.names[p] + ' looks at the top ' + cs.length + ' card' + (cs.length > 1 ? 's' : '') + ' of the deck.', p);
+      const picks = yield* g.selectCards(p, cs.filter(c => o.pick(c)), { title: o.title, min: o.min || 0, max: o.max || 1, purpose: o.purpose || 'callFromDeck' });
+      for (const c of picks) if (pl.trig.includes(c)) yield* o.take(c);
+      for (const c of cs) if (pl.trig.includes(c)) { g.take(pl.trig, c); if (o.rest === 'drop') pl.drop.push(c); else if (o.rest === 'soul') g.toZone(p, [c], 'soul'); else pl.deck.push(c); }
+      if (o.shuffle) g.shuffle(pl.deck);
+      g.checkRules(); return picks;
+    }
+    function* callFromTrig(g, p, c, o) { return yield* g.callFrom(p, c, 'trig', Object.assign({ from: 'deck' }, o || {})); }
+    function* toHandFromTrig(g, p, c) { const pl = g.P(p); g.take(pl.trig, c); pl.hand.push(c); g.log(g.names[p] + ' puts ' + g.name(c) + ' into hand.', p); }
+    function* searchToHand(g, p, filter, title) { const cs = yield* g.searchDeck(p, { title, filter, max: 1, purpose: 'search' }); for (const c of cs) yield* toHandFromTrig(g, p, c); return cs; }
+    function* retireOpp(g, x, filter, title) { if (!oppRGs(g, x, filter).length) return null; const c = yield* g.chooseUnit(x.p, { owner: opp(x), rearOnly: true, filter, title: title || 'Retire which of your opponent\'s rear-guards?', purpose: 'retire', alwaysAsk: true }); return c ? g.retire(opp(x), c, 'ability') : null; }
+    // "discarded from hand during your turn" units that call themselves
+    const discardCall = name => ({ kind: 'AUTO', on: 'discarded', label: 'Call this card from the drop', cost: { sb: 1 },
+      cond: (g, x) => g.active === x.p && g.vgGrade(x.p) >= 2 && !g.tf.rideCost && g.P(x.p).drop.includes(x.card) && g.def(x.card).grade <= g.vgGrade(x.p),
+      resolve: function* (g, x) { if (!g.P(x.p).drop.includes(x.card)) return; const u = yield* g.callFrom(x.p, x.card, 'drop', { from: 'drop' }); if (u && g.phase === 'battle') u.noAttackTurn = g.turn; } });
+    const DISCARD_TEXT = '[AUTO]: When this card is discarded from your hand during your turn, if your vanguard is grade 2 or greater, [COST: SB1], call this card to (RC). If it is your battle phase, it cannot attack this turn.';
+    // "+5000 power / shield +5000 while behind" commons
+    const behind = (g, x) => g.vgGrade(x.p) < g.vgGrade(opp(x)) || g.P(x.p).damage.length >= 4;
+    const behindAbs = [{ kind: 'CONT', zones: ['RC'], power: selfPower(5000, behind) }, { kind: 'CONT', zones: ['GC'], shield: (g, x) => behind(g, x) ? 5000 : 0 }];
+    const BEHIND_TEXT = '[CONT](RC)/(GC): If your vanguard\'s grade is lower than your opponent\'s vanguard\'s, or you have four or more cards in your damage zone, this unit gets +5000 power / shield +5000.';
+    // the R+ trigger units
+    const crit4 = (no, name, nation, race) => ({ set: S, no, name, nation, grade: 0, type: 'unit', power: 4000, shield: 15000, skill: 'boost', crit: 1, trigger: 'crit', race, verified: true,
+      text: 'Critical Trigger: one unit gets critical +1 and one unit gets +10000 until end of turn.\n[AUTO](RC): At the end of the battle this unit boosted, [COST: put this unit into your soul], choose one of your units; it gets +2000 until end of turn.',
+      abilities: [{ kind: 'AUTO', on: 'boostEnd', zones: ['RC'], optional: true, label: 'Into the soul: a unit +2000', cost: { selfToSoul: true }, resolve: function* (g, x) { yield* g.buff(x.p, { power: 2000, until: 'turn' }); } }] });
+    const draw4 = (no, name, nation, race) => ({ set: S, no, name, nation, grade: 0, type: 'unit', power: 4000, shield: 5000, skill: 'boost', crit: 1, trigger: 'draw', race, verified: true,
+      text: 'Draw Trigger: draw 1, and one unit gets +10000 until end of turn.\n[CONT](GC): If your opponent\'s vanguard is grade 3 or greater, this unit gets shield +5000.',
+      abilities: [{ kind: 'CONT', zones: ['GC'], shield: (g, x) => { const v = g.P(1 - x.p).vc; return v && g.def(v.c).grade >= 3 ? 5000 : 0; } }] });
+    const add = {};
+
+    /* ======================= Dragon Empire ======================= */
+    const koti = vgHas('Kotihblaze');
+    add['002'] = U('002', 'Fiery Immolation Dragon, Kotihblaze', DE, 3, {
+      race: 'Flame Dragon',
+      text: '[ACT](VC)[1/turn]: [COST: CB1], look at the top five cards of your deck, choose up to two grade 3 or less cards with different card names from this unit, reveal them, call up to one of them to (RC), put the rest of the revealed cards into your soul, and shuffle your deck.\n[AUTO](VC): At the end of the battle this unit attacked, choose one: [COST: SB2] for each card soul blasted, choose up to one of your rear-guards with the same card name, [Stand] them, and they get +5000 until end of turn; or [COST: Soul Blast two cards with the same card name as this unit & discard a card from your hand], [Stand] this unit, and it gets +5000 and drive -1 until end of turn.',
+      abilities: [
+        { kind: 'ACT', zones: ['VC'], oncePerTurn: true, label: 'Look at the top five: call one, the other to the soul', cost: { cb: 1 },
+          resolve: function* (g, x) {
+            const pl = g.P(x.p); const me = g.name(x.unit.c); const cs = pl.deck.splice(0, Math.min(5, pl.deck.length)); pl.trig.push(...cs);
+            const picks = yield* g.selectCards(x.p, cs.filter(c => g.def(c).grade <= 3 && g.name(c) !== me), { title: 'Kotihblaze: reveal up to two cards (one will be called, the other goes to the soul)', min: 0, max: 2, purpose: 'search' });
+            if (picks.length) g.log(g.names[x.p] + ' reveals ' + picks.map(c => g.name(c)).join(' and ') + '.', x.p);
+            const callable = picks.filter(c => isUnit(g, c) && g.def(c).grade <= g.vgGrade(x.p));
+            const call = callable.length ? (yield* g.selectCards(x.p, callable, { title: 'Call which revealed card?', min: 0, max: 1, purpose: 'callFromDeck' }))[0] : null;
+            if (call) yield* callFromTrig(g, x.p, call);
+            for (const c of picks) if (pl.trig.includes(c)) { g.take(pl.trig, c); g.toZone(x.p, [c], 'soul'); }
+            for (const c of cs) if (pl.trig.includes(c)) { g.take(pl.trig, c); pl.deck.push(c); }
+            g.shuffle(pl.deck); g.checkRules();
+          } },
+        { kind: 'AUTO', on: 'battleEndVC', zones: ['VC'], label: 'Stand rear-guards with the soul blasted names (or stand this unit)',
+          cond: (g, x) => g.P(x.p).soul.length >= 2,
+          resolve: function* (g, x) {
+            const pl = g.P(x.p); const me = g.name(x.unit.c);
+            const canSelf = pl.soul.filter(c => g.name(c) === me).length >= 2 && pl.hand.length >= 1;
+            const opts = [{ key: 'rg', label: 'SB2: stand rear-guards with the same names, +5000' }].concat(canSelf ? [{ key: 'vc', label: 'SB2 (two "' + me + '") & discard 1: stand this unit, +5000, drive -1' }] : []).concat([{ key: 'no', label: 'Do nothing' }]);
+            const k = yield* pickOne(g, x.p, 'Kotihblaze: choose one', opts);
+            if (k === 'rg') {
+              yield* g.soulBlast(x.p, 2); const names = (g.lastSoulBlasted || []).map(c => g.name(c)); const used = [];
+              for (const nm of names) {
+                const c = yield* g.chooseUnit(x.p, { rearOnly: true, optional: true, filter: r => g.name(r.u.c) === nm && !used.includes(r.u), title: 'Stand a "' + nm + '" rear-guard (+5000)?', purpose: 'stand' });
+                if (c) { const u = g.unitAt(x.p, c); used.push(u); g.stand(u); g.addMod(u, { power: 5000, until: 'turn' }); g.log(g.name(u.c) + ' stands, +5000.', x.p); }
+              }
+              yield* g._flushStood();
+            } else if (k === 'vc') {
+              yield* g.pay(x.p, { sbPick: { n: 2, label: '"' + me + '"', filter: (gg, c) => gg.name(c) === me }, discard: 1 }, null, x);
+              g.stand(x.unit); g.addMod(x.unit, { power: 5000, drive: -1, until: 'turn' }); g.log(me + ' stands (+5000, drive -1).', x.p); yield* g._flushStood();
+            }
+          } }
+      ]
+    });
+    add['004'] = U('004', 'Flame Kickboxer, Tairan', DE, 2, {
+      race: 'Human',
+      text: '[AUTO](RC): When this unit attacks, if you have a grade 3 or greater vanguard with "Kotihblaze" in its card name, this unit gets +5000 until end of turn.\n[AUTO](RC): At the end of the battle this unit attacked, you may reveal a grade 3 card with "Kotihblaze" in its card name from your ride deck. If you revealed, or you have a grade 3 or greater vanguard with "Kotihblaze" in its card name, [COST: put this unit into your soul], draw 1.',
+      abilities: [
+        { kind: 'AUTO', on: 'attack', zones: ['RC'], label: 'This unit +5000', cond: koti, resolve: function* (g, x) { plusTurn(g, x.unit, x.p, 5000); } },
+        { kind: 'AUTO', on: 'battleEnd', zones: ['RC'], optional: true, label: 'Into the soul: draw 1', cost: { selfToSoul: true }, cond: (g, x) => koti(g, x) || g.P(x.p).rideDeck.some(c => g.def(c).grade === 3 && g.name(c).includes('Kotihblaze')), resolve: function* (g, x) { g.draw(x.p, 1); } }
+      ]
+    });
+    add['020'] = U('020', 'Emberbreath Dragon', DE, 3, {
+      race: 'Flame Dragon',
+      text: '[CONT](RC): During your turn, if you have a grade 3 or greater vanguard with "Kotihblaze" in its card name, this unit gets +5000.\n[ACT](RC)[1/turn]: If you have a grade 3 or greater vanguard with "Kotihblaze" in its card name, [COST: CB1], look at the top three cards of your deck, reveal up to one: if it is a grade 2 or less normal unit, call it to (RC); otherwise put it into your hand. Shuffle your deck. At the end of that turn, put this unit into your soul.',
+      abilities: [
+        { kind: 'CONT', zones: ['RC'], power: selfPower(5000, (g, x) => myTurn(g, x) && koti(g, x)) },
+        { kind: 'ACT', zones: ['RC'], oncePerTurn: true, label: 'Look at the top three: call or take one', cost: { cb: 1 }, cond: koti,
+          resolve: function* (g, x) {
+            yield* lookTop(g, x.p, 3, { title: 'Emberbreath: reveal up to one card (grade 2 or less normal units are called)', pick: () => true, shuffle: true, purpose: 'search',
+              take: function* (c) { if (isNormal(g, c) && g.def(c).grade <= 2) yield* callFromTrig(g, x.p, c); else yield* toHandFromTrig(g, x.p, c); } });
+            (g.tf.endTurnSoul || (g.tf.endTurnSoul = [])).push(x.unit);
+          } }
+      ]
+    });
+    add['021'] = U('021', 'Ravaging Dragon', DE, 2, {
+      race: 'Earth Dragon',
+      text: '[AUTO](RC): When this unit is boosted, it gets +5000 until end of that battle for each set order in your order zone. If it got +15000 or more, [COST: SB1], until end of that battle, your opponent must call two or more cards at the same time to call cards from hand to (GC).',
+      abilities: [{ kind: 'AUTO', on: 'boosted', zones: ['RC'], label: '+5000 per set order', cond: (g, x) => setOrders(g, x.p) > 0 && !!g.battle && g.battle.aUnit === x.unit,
+        resolve: function* (g, x) {
+          const n = setOrders(g, x.p); plusBattle(g, x.unit, x.p, 5000 * n);
+          if (n >= 3 && g.P(x.p).soul.length >= 1 && (yield* g.yesno(x.p, 'Ravaging Dragon: SB1 so your opponent must guard with two or more cards?', 'ability'))) { yield* g.soulBlast(x.p, 1); g.battle.multiGuard = 'Ravaging Dragon'; g.battle.multiGuardMin = 2; }
+        } }]
+    });
+    add['022'] = U('022', 'Laurence Glare Dragon', DE, 2, {
+      race: 'Flame Dragon', text: DISCARD_TEXT + '\n[CONT](RC): If you have more rear-guards than your opponent, this unit gets [Boost].',
+      abilities: [discardCall(), { kind: 'CONT', zones: ['RC'], gainBoost: (g, x) => g.rearguards(x.p).length > g.rearguards(opp(x)).length }]
+    });
+    add['023'] = U('023', 'Spark Spike Dragon', DE, 1, {
+      race: 'Thunder Dragon', clan: 'Narukami', verified: false,
+      text: '[CONT](RC): If you have a vanguard whose only clan is "Narukami", your other rear-guards in this column get +5000 (+10000 if your vanguard\'s attack hit two or more times this turn).\n[AUTO](RC): At the end of the battle this unit boosted, if your vanguard\'s attack hit two or more times this turn, [COST: EB3], draw 1.' + NOT_AUTO
+    });
+    add['043'] = reissue('DZ-SS13/018', '043');
+    add['044'] = crit4('044', 'Burning Flail Dragon', DE, 'Flame Dragon');
+    add['045'] = draw4('045', 'Flare Veil Dragon', DE, 'Flame Dragon');
+    add['046'] = reissue('D-BT02/030', '046');
+    add['059'] = U('059', 'Dragritter, Jadan', DE, 2, {
+      race: 'Dragoroid',
+      text: '[AUTO]: When this unit is placed on (RC), if you have a grade 3 or greater vanguard with "Kotihblaze" in its card name, [COST: CB1], choose one of your opponent\'s rear-guards and retire it. Then you may [COST: discard a card from your hand] to choose another of your opponent\'s rear-guards and retire it.\n[AUTO]: When this unit is retired from (RC) or (GC), if you have a grade 3 or greater vanguard with "Kotihblaze" in its card name, you may put this card into your soul.',
+      abilities: [
+        { kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'Retire an opponent\'s rear-guard (discard 1 for another)', cost: { cb: 1 }, cond: (g, x) => koti(g, x) && oppRGs(g, x).length > 0,
+          resolve: function* (g, x) {
+            yield* retireOpp(g, x);
+            if (oppRGs(g, x).length && g.P(x.p).hand.length && (yield* g.yesno(x.p, 'Jadan: discard a card to retire another rear-guard?', 'ability'))) { yield* g.discard(x.p, 1, 'Jadan: discard 1'); yield* retireOpp(g, x); }
+          } },
+        { kind: 'AUTO', on: 'retiredBy', optional: true, label: 'Put this card into the soul', cond: (g, x) => koti(g, x) && g.P(x.p).drop.includes(x.card),
+          resolve: function* (g, x) { const pl = g.P(x.p); if (pl.drop.includes(x.card)) { g.take(pl.drop, x.card); g.toZone(x.p, [x.card], 'soul'); g.log(g.name(x.card) + ' goes into the soul.', x.p); } } }
+      ]
+    });
+    add['060'] = U('060', 'Explosive Dash Dragon, Gallimimspurt', DE, 2, {
+      race: 'Dinodragon', text: '[AUTO]: When this unit is placed on (RC), if you played an order this turn, you may Soul-Charge 2.',
+      abilities: [{ kind: 'AUTO', on: 'placedRC', zones: ['RC'], optional: true, label: 'Soul-Charge 2', cond: (g, x) => !!g.tf.orderThisTurn[x.p], resolve: function* (g, x) { g.soulCharge(x.p, 2); } }]
+    });
+    add['062'] = U('062', 'Dancing Princess of the Gale, Ainsley', DE, 1, {
+      race: 'Human', text: '[AUTO](RC): When this unit attacks, if your order zone has one or more set orders, this unit gets +5000 until end of that battle. If it has three or more, it gets +15000 instead.',
+      abilities: [{ kind: 'AUTO', on: 'attack', zones: ['RC'], label: '+5000 (+15000 with three set orders)', cond: (g, x) => setOrders(g, x.p) >= 1, resolve: function* (g, x) { plusBattle(g, x.unit, x.p, setOrders(g, x.p) >= 3 ? 15000 : 5000); } }]
+    });
+    add['063'] = ORD('063', 'Polar Quake Sword, Ligetung', DE, 3, 'normal', {
+      cost: { cb: 1 }, verified: false,
+      text: 'Normal Order. [COST: CB1] Choose one of your opponent\'s rear-guards and retire it. If you have a vanguard with "Shojodoji" in its card name, bind it instead.',
+      canPlay: (g, x) => oppRGs(g, x).length > 0,
+      play: function* (g, x) {
+        const c = yield* g.chooseUnit(x.p, { owner: opp(x), rearOnly: true, title: 'Ligetung: which rear-guard?', purpose: 'retire', alwaysAsk: true }); if (!c) return;
+        if (vgNamed(g, x.p, 'Shojodoji', 0)) { const u = g.removeUnit(opp(x), c, 'bind'); if (u) g.log(g.name(u.c) + ' is bound.', x.p); } else g.retire(opp(x), c, 'ability');
+      }
+    });
+    add['084'] = U('084', 'Galvanic Edge Dragon', DE, 3, {
+      race: 'Thunder Dragon', text: '[AUTO](RC): When this unit attacks a vanguard, discard the top card of your deck. If a trigger unit was discarded, choose one of your opponent\'s rear-guards and retire it. If you did not retire, this unit gets +5000 until end of that battle.',
+      abilities: [{ kind: 'AUTO', on: 'attack', zones: ['RC'], label: 'Discard the top card: retire or +5000', cond: g => !!g.battle && g.battle.targetIsVC,
+        resolve: function* (g, x) {
+          const pl = g.P(x.p); const c = pl.deck.shift(); if (!c) return; pl.drop.push(c); g.log(g.names[x.p] + ' discards ' + g.name(c) + ' from the top of the deck.', x.p); g.checkRules();
+          if (g.def(c).trigger && (yield* retireOpp(g, x))) return;
+          plusBattle(g, x.unit, x.p, 5000);
+        } }]
+    });
+    add['085'] = U('085', 'Flame-severing Dragon, Baldras', DE, 2, {
+      race: 'Flame Dragon',
+      text: '[AUTO]: When this unit is rode upon by a grade 3 card with "Kotihblaze" in its card name, draw 1, choose up to one grade 3 or less card from your hand, and call it to (RC). If you did not call, choose a card from your hand and discard it.\n[CONT](RC): If you have a grade 3 or greater vanguard with "Kotihblaze" in its card name, this unit gets +5000.',
+      abilities: [
+        { kind: 'AUTO', on: 'rodeUpon', label: 'Draw 1, call a card from hand', cond: (g, x) => g.def(x.newCard).grade === 3 && g.name(x.newCard).includes('Kotihblaze'),
+          resolve: function* (g, x) {
+            g.draw(x.p, 1); const pl = g.P(x.p);
+            const cs = yield* g.selectCards(x.p, pl.hand.filter(c => isUnit(g, c) && g.def(c).grade <= Math.min(3, g.vgGrade(x.p))), { title: 'Baldras: call up to one card from your hand', min: 0, max: 1, purpose: 'callFromHand' });
+            if (cs.length) { for (const c of cs) yield* g.callFrom(x.p, c, 'hand', { from: 'hand' }); } else yield* g.discard(x.p, 1, 'Baldras: discard 1');
+          } },
+        { kind: 'CONT', zones: ['RC'], power: selfPower(5000, koti) }
+      ]
+    });
+    add['086'] = U('086', 'Against Spear Dragon', DE, 2, { race: 'Wind Dragon', power: 8000, text: BEHIND_TEXT, abilities: behindAbs });
+    add['087'] = U('087', 'Fire Pole Emperor, Dajaru', DE, 1, {
+      race: 'Human',
+      text: '[ACT](RC)[1/turn]: If you have a grade 3 or greater vanguard with "Kotihblaze" in its card name, [COST: [Rest] this unit], choose a normal unit other than a sentinel from your drop, put it on the bottom of your deck, then choose one of your units with the same card name; it gets +5000 until end of turn.\n[AUTO](RC): When your grade 3 or greater vanguard with "Kotihblaze" in its card name is attacked, [COST: put this unit into your soul], choose one of your vanguards; it gets +15000 until end of that battle.',
+      abilities: [
+        { kind: 'ACT', zones: ['RC'], oncePerTurn: true, label: 'Drop to the bottom: same-name unit +5000', cost: { restSelf: true }, cond: (g, x) => koti(g, x) && g.P(x.p).drop.some(c => isNormal(g, c) && !g.def(c).sentinel),
+          resolve: function* (g, x) {
+            const pl = g.P(x.p); const cs = yield* g.selectCards(x.p, pl.drop.filter(c => isNormal(g, c) && !g.def(c).sentinel), { title: 'Dajaru: put a normal unit from your drop on the bottom of your deck', min: 1, max: 1, purpose: 'fromDrop' });
+            for (const c of cs) { g.take(pl.drop, c); pl.deck.push(c); yield* g.buff(x.p, { power: 5000, until: 'turn', optional: true, filter: s => g.name(s.u.c) === g.name(c), title: '+5000 to which "' + g.name(c) + '"?' }); }
+          } },
+        { kind: 'AUTO', on: 'vcAttacked', zones: ['RC'], label: 'Into the soul: your vanguard +15000', cost: { selfToSoul: true }, cond: (g, x) => !!g.battle && g.battle.tp === x.p && koti(g, x),
+          resolve: function* (g, x) { const v = g.P(x.p).vc; if (v) plusBattle(g, v, x.p, 15000); } }
+      ]
+    });
+    add['088'] = U('088', 'Dust Storm of Dignified Bullet, Mallory', DE, 1, {
+      race: 'Human', text: '[AUTO](RC): When this unit attacks or boosts, if your opponent\'s vanguard is grade 3 or greater and they have one or fewer rear-guards, this unit gets +10000 until end of that battle.',
+      abilities: ['attack', 'boost'].map(on => ({ kind: 'AUTO', on, zones: ['RC'], label: 'This unit +10000', cond: (g, x) => oppVG3(g, x) && g.rearguards(opp(x)).length <= 1, resolve: function* (g, x) { plusBattle(g, x.unit, x.p, 10000); } }))
+    });
+    add['089'] = U('089', 'Divine Blaze Ear, Synfol', DE, 1, {
+      race: 'Flame Dragon',
+      text: '[AUTO]: When this unit is rode upon by "Flame-severing Dragon, Baldras", [COST: SB1], look at the top seven cards of your deck, choose up to two cards with different grades, reveal them, put one grade 3 card from among them into your hand, put the rest into your soul, and shuffle your deck.',
+      abilities: [{ kind: 'AUTO', on: 'rodeUpon', label: 'Look at the top seven', cost: { sb: 1 }, cond: (g, x) => g.name(x.newCard) === 'Flame-severing Dragon, Baldras',
+        resolve: function* (g, x) {
+          const pl = g.P(x.p); const cs = pl.deck.splice(0, Math.min(7, pl.deck.length)); pl.trig.push(...cs);
+          let picks = yield* g.selectCards(x.p, cs, { title: 'Synfol: reveal up to two cards with different grades (a grade 3 goes to hand, the rest to the soul)', min: 0, max: 2, purpose: 'search' });
+          if (picks.length === 2 && g.def(picks[0]).grade === g.def(picks[1]).grade) picks = [picks[0]];
+          const g3 = picks.find(c => g.def(c).grade === 3);
+          if (g3) yield* toHandFromTrig(g, x.p, g3);
+          for (const c of picks) if (pl.trig.includes(c)) { g.take(pl.trig, c); g.toZone(x.p, [c], 'soul'); }
+          for (const c of cs) if (pl.trig.includes(c)) { g.take(pl.trig, c); pl.deck.push(c); }
+          g.shuffle(pl.deck); g.checkRules();
+        } }]
+    });
+    add['091'] = U('091', 'Multiple Strokes Dragon', DE, 1, { race: 'Thunder Dragon', text: '[CONT](RC)/(GC): If your opponent\'s drop has five or more cards, this unit gets +5000 power / shield +5000.',
+      abilities: [{ kind: 'CONT', zones: ['RC'], power: selfPower(5000, (g, x) => g.P(opp(x)).drop.length >= 5) }, { kind: 'CONT', zones: ['GC'], shield: (g, x) => g.P(1 - x.p).drop.length >= 5 ? 5000 : 0 }] });
+    add['092'] = U('092', 'Divine Blaze Eye, Enryui', DE, 0, { race: 'Flame Dragon', text: G0TEXT, abilities: [firstVanguardDraw] });
+    // Shojodoji (its ride line and Stealth support are in other sets)
+    const stealth = c => /Stealth/.test(c);
+    add['001'] = U('001', 'Cloudwater Flitfoot Stealth Rogue, Shojodoji', DE, 3, {
+      race: 'Demon', alsoNamed: 'Peak Personage Stealth Rogue, Shojodoji', verified: false,
+      text: '[CONT](VC): This unit is also regarded as "Peak Personage Stealth Rogue, Shojodoji".\n[ACT](VC)[1/turn]: [COST: EB3 & bind three cards with "Stealth" in their card names from your soul], choose two of your opponent\'s (RC) and bind all cards on them. Your opponent chooses a card from their hand and binds it. At the end of that turn, your opponent puts those bound cards into their hand.\n[AUTO](VC): When this unit attacks or is attacked, [COST: put two of your rear-guards into your soul], choose up to two cards with "Stealth" in their card names from your bind zone, and call them to a front row and a back row (RC). (During your opponent\'s battle phase they are called to (GC) instead: not automated.)',
+      abilities: [
+        { kind: 'ACT', zones: ['VC'], oncePerTurn: true, label: 'Bind two opposing circles', cost: { eb: 3 }, cond: (g, x) => g.P(x.p).soul.filter(c => stealth(g.name(c))).length >= 3,
+          resolve: function* (g, x) {
+            const pl = g.P(x.p); const o = g.P(opp(x)); const ret = (g.tf.returnBound || (g.tf.returnBound = [[], []]))[opp(x)];
+            const cs = yield* g.selectCards(x.p, pl.soul.filter(c => stealth(g.name(c))), { title: 'Cost: bind three "Stealth" cards from your soul', min: 3, max: 3, purpose: 'soulblast' });
+            for (const c of cs) { g.take(pl.soul, c); pl.bind.push(c); }
+            for (let i = 0; i < 2; i++) {
+              const c = yield* g.chooseUnit(x.p, { owner: opp(x), rearOnly: true, optional: true, title: 'Bind the cards on which of your opponent\'s circles? (' + (i + 1) + '/2)', purpose: 'retire' }); if (!c) break;
+              const u = g.unitAt(opp(x), c); const cards = [u.c].concat(u.under).filter(cc => !cc.token);
+              g.setUnit(opp(x), c, null); for (const cc of cards) { o.bind.push(cc); ret.push(cc); } g.log(g.name(u.c) + ' is bound.', x.p);
+            }
+            if (o.hand.length) { const h = yield* g.selectCards(opp(x), o.hand.slice(), { title: 'Bind a card from your hand (it returns at the end of the turn)', min: 1, max: 1, purpose: 'discard' }); for (const c of h) { g.take(o.hand, c); o.bind.push(c); ret.push(c); } }
+          } },
+        ...['vcAttacks', 'vcAttacked'].map(on => ({ kind: 'AUTO', on, zones: ['VC'], label: 'Call Stealth cards from the bind zone', cost: { otherToSoul: 2 },
+          cond: (g, x) => !!g.battle && (on === 'vcAttacks' ? g.battle.aUnit === x.unit : g.battle.tp === x.p && g.active === x.p) && g.P(x.p).bind.some(c => isUnit(g, c) && stealth(g.name(c))),
+          resolve: function* (g, x) {
+            const pl = g.P(x.p);
+            const cs = yield* g.selectCards(x.p, pl.bind.filter(c => isUnit(g, c) && stealth(g.name(c)) && g.def(c).grade <= g.vgGrade(x.p)), { title: 'Call up to two Stealth cards from your bind zone', min: 0, max: 2, purpose: 'callFromDrop' });
+            for (const [i, c] of cs.entries()) yield* g.callFrom(x.p, c, 'bind', { from: 'bind', circles: i === 0 ? FRONT_RC : BACK });
+          } }))
+      ]
+    });
+    add['003'] = U('003', 'Stealth Dragon, Ougijishi', DE, 2, {
+      race: 'Abyss Dragon',
+      text: '[AUTO]: When this unit is placed on (RC), look at the top five cards of your deck, choose up to one card with "Stealth" in its card name, put it into your soul, and shuffle your deck. If your opponent\'s vanguard is grade 3 or greater, this unit gets +5000 until end of turn.\n[AUTO]: When this unit is put into your soul from (RC) during your battle phase, [COST: CB1], choose two face-up cards in your opponent\'s bind zone and put them into their drop. Then your front row units with "Stealth" in their card names get +5000 until end of turn.',
+      abilities: [
+        { kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'A Stealth card to the soul',
+          resolve: function* (g, x) {
+            yield* lookTop(g, x.p, 5, { title: 'Ougijishi: put up to one "Stealth" card into your soul', pick: c => stealth(g.name(c)), shuffle: true, purpose: 'search', take: function* (c) { g.take(g.P(x.p).trig, c); g.toZone(x.p, [c], 'soul'); } });
+            if (oppVG3(g, x) && g.circOf(x.p, x.unit)) plusTurn(g, x.unit, x.p, 5000);
+          } },
+        { kind: 'AUTO', on: 'toSoulFromRC', label: 'Opponent\'s bind to drop, Stealth front row +5000', cost: { cb: 1 }, cond: (g, x) => g.phase === 'battle' && g.active === x.p,
+          resolve: function* (g, x) {
+            const o = g.P(opp(x)); const cs = yield* g.selectCards(x.p, o.bind.filter(c => !c.fd), { title: 'Put up to two face-up cards from your opponent\'s bind zone into their drop', min: 0, max: 2, purpose: 'retire' });
+            for (const c of cs) { g.take(o.bind, c); o.drop.push(c); }
+            for (const c of ['VC', 'FL', 'FR']) { const u = g.unitAt(x.p, c); if (u && stealth(g.name(u.c))) g.addMod(u, { power: 5000, until: 'turn' }); }
+          } }
+      ]
+    });
+    add['061'] = U('061', 'Fulgent Stealth Rogue, Kinran', DE, 1, {
+      race: 'Demon',
+      text: '[AUTO](RC): At the end of the battle this unit boosted, if you have a grade 3 or greater vanguard with "Shojodoji" in its card name, you may [COST: put two rear-guards with "Stealth" in their card names in this unit\'s column into your soul] to put a grade 2 or greater unit with "Stealth" in its card name from your drop into your hand.',
+      abilities: [{ kind: 'AUTO', on: 'boostEnd', zones: ['RC'], optional: true, label: 'Column to the soul: a Stealth unit to hand',
+        cond: (g, x) => vgNamed(g, x.p, 'Shojodoji') && g.rearguards(x.p).filter(r => COL[r.circ] === COL[x.circ] && stealth(g.name(r.u.c))).length >= 2 && g.P(x.p).drop.some(c => isUnit(g, c) && g.def(c).grade >= 2 && stealth(g.name(c))),
+        resolve: function* (g, x) {
+          const col = COL[x.circ];
+          for (const r of g.rearguards(x.p).filter(r => COL[r.circ] === col && stealth(g.name(r.u.c))).slice(0, 2)) { g.removeUnit(x.p, r.circ, 'soul'); if (!r.u.c.token) yield* g.fire('toSoulFromRC', { p: x.p, card: r.u.c }); }
+          const pl = g.P(x.p); const cs = yield* g.selectCards(x.p, pl.drop.filter(c => isUnit(g, c) && g.def(c).grade >= 2 && stealth(g.name(c))), { title: 'Put a Stealth unit from your drop into your hand', min: 1, max: 1, purpose: 'fromDrop' });
+          for (const c of cs) { g.take(pl.drop, c); pl.hand.push(c); }
+        } }]
+    });
+    add['090'] = U('090', 'Stealth Beast, Rokurai', DE, 1, {
+      race: 'High Beast', text: '[AUTO](RC): When this unit boosts, if you have a grade 3 or greater vanguard with "Shojodoji" in its card name, you may [COST: put a card from your hand into your soul] to put a face-up card from your opponent\'s bind zone into their drop.',
+      abilities: [{ kind: 'AUTO', on: 'boost', zones: ['RC'], optional: true, label: 'Opponent\'s bind card to the drop', cost: { handToSoul: 1 }, cond: (g, x) => vgNamed(g, x.p, 'Shojodoji') && g.P(opp(x)).bind.some(c => !c.fd),
+        resolve: function* (g, x) { const o = g.P(opp(x)); const cs = yield* g.selectCards(x.p, o.bind.filter(c => !c.fd), { title: 'Put a card from your opponent\'s bind zone into their drop', min: 1, max: 1, purpose: 'retire' }); for (const c of cs) { g.take(o.bind, c); o.drop.push(c); } } }]
+    });
+
+    /* ======================= Dark States ======================= */
+    const SG = 'One Who Governs Rituals, Sacrifice Glass', GD = 'Manifestation of the Great Skyline, Grandogma';
+    const gdBound = (g, p) => g.P(p).bind.filter(c => g.name(c) === GD).length;
+    add['005'] = U('005', SG, DS, 3, {
+      race: 'Demon',
+      text: '[AUTO](VC): At the beginning of your main phase, until end of turn, you get "When your opponent\'s unit is retired from (RC) or (GC), Energy-Charge 1."\n[AUTO](VC): At the end of the battle this unit attacked a vanguard, [COST: EB4], search your deck, hand, or drop for one "' + GD + '", ride it as [Stand], and it gets +15000 and drive -2 until end of turn. If you searched your deck, shuffle it. If you rode, your opponent may draw 1.',
+      abilities: [
+        { kind: 'AUTO', on: 'mainStart', zones: ['VC'], label: 'Energy-Charge 1 whenever an opposing unit is retired this turn', resolve: function* (g, x) { (g.tf.ecOnOppRetire || (g.tf.ecOnOppRetire = [false, false]))[x.p] = true; } },
+        { kind: 'AUTO', on: 'battleEndVC', zones: ['VC'], label: 'Ride Grandogma as [Stand]', cost: { eb: 4 },
+          cond: (g, x) => !!g.battle && g.battle.targetIsVC && (() => { const pl = g.P(x.p); return pl.deck.concat(pl.hand, pl.drop).some(c => g.name(c) === GD); })(),
+          resolve: function* (g, x) {
+            const pl = g.P(x.p); const pool = pl.hand.concat(pl.drop, pl.deck).filter(c => g.name(c) === GD);
+            const c = (yield* g.selectCards(x.p, pool, { title: 'Ride which Grandogma as [Stand]?', min: 1, max: 1, purpose: 'rideFromDrop' }))[0]; if (!c) return;
+            const zone = pl.hand.includes(c) ? 'hand' : pl.drop.includes(c) ? 'drop' : 'deck';
+            const u = yield* g.rideFrom(x.p, c, zone, { stand: true }); if (zone === 'deck') g.shuffle(pl.deck);
+            if (u) { g.addMod(u, { power: 15000, drive: -2, until: 'turn' }); g.log(g.name(u.c) + ' rides as [Stand] (+15000, drive -2).', x.p); g.draw(opp(x), 1); }
+          } }
+      ]
+    });
+    add['006'] = U('006', GD, DS, 3, {
+      race: 'Ghost',
+      text: '[AUTO]: When this card is bound by anything other than the ability of a card with the same card name, put it into your drop.\n[AUTO](VC)[1/turn]: At the end of the battle this unit attacked, choose one of your opponent\'s rear-guards and retire it. If your bind zone has a card with this card\'s name, retire another. If it has two or more, [Stand] this unit.\n[AUTO](VC): At the end of your turn, if your bind zone has one or fewer cards with this card\'s name, ride a "' + SG + '" from your soul as [Rest], and bind this card.',
+      abilities: [
+        { kind: 'AUTO', on: 'battleEndVC', zones: ['VC'], oncePerTurn: true, label: 'Retire rear-guards (and stand)',
+          resolve: function* (g, x) {
+            const n = gdBound(g, x.p);
+            yield* retireOpp(g, x); if (n >= 1) yield* retireOpp(g, x);
+            if (n >= 2) { g.stand(x.unit); g.log(g.name(x.unit.c) + ' stands.', x.p); yield* g._flushStood(); }
+          } },
+        { kind: 'AUTO', on: 'endOfTurn', zones: ['VC'], label: 'Ride Sacrifice Glass from the soul, bind this card', cond: (g, x) => gdBound(g, x.p) <= 1 && g.P(x.p).soul.some(c => g.name(c) === SG),
+          resolve: function* (g, x) {
+            const pl = g.P(x.p); const me = x.unit.c; const c = pl.soul.find(cc => g.name(cc) === SG); if (!c) return;
+            yield* g.rideFrom(x.p, c, 'soul', { rest: true });
+            if (pl.soul.includes(me)) { g.take(pl.soul, me); pl.bind.push(me); g.log(g.name(me) + ' is bound.', x.p); }
+          } }
+      ]
+    });
+    add['026'] = U('026', 'Eternal Musician, Muusi', DS, 2, {
+      race: 'Demon', text: '[AUTO](front row RC): When your grade 3 or greater vanguard with "Sacrifice Glass" in its card name attacks, choose one of your opponent\'s rear-guards and retire it.\n[AUTO](RC): When your grade 3 or greater vanguard with "Grandogma" in its card name attacks, this unit gets +10000 until end of turn.',
+      abilities: [
+        { kind: 'AUTO', on: 'vcAttacks', zones: ['RC'], label: 'Retire an opponent\'s rear-guard', cond: (g, x) => FRONT_RC.includes(x.circ) && vgNamed(g, x.p, 'Sacrifice Glass') && oppRGs(g, x).length > 0, resolve: function* (g, x) { yield* retireOpp(g, x); } },
+        { kind: 'AUTO', on: 'vcAttacks', zones: ['RC'], label: 'This unit +10000', cond: vgHas('Grandogma'), resolve: function* (g, x) { plusTurn(g, x.unit, x.p, 10000); } }
+      ]
+    });
+    add['027'] = U('027', 'Merry Wildmaster, Averil', DS, 1, {
+      race: 'Demon', text: '[AUTO]: When this unit is placed on (RC), you may Soul-Charge 1.\n[AUTO](RC)[1/turn]: When your other unit is placed in this unit\'s column, if your vanguard is grade 3 or greater, this unit gets +5000 until end of turn.',
+      abilities: [
+        { kind: 'AUTO', on: 'placedRC', zones: ['RC'], optional: true, label: 'Soul-Charge 1', resolve: function* (g, x) { g.soulCharge(x.p, 1); } },
+        { kind: 'AUTO', on: 'allyPlaced', zones: ['RC'], oncePerTurn: true, label: 'This unit +5000', cond: (g, x) => x.trigUnit !== x.unit && g.vgGrade(x.p) >= 3 && COL[g.circOf(x.p, x.trigUnit)] === COL[x.circ], resolve: function* (g, x) { plusTurn(g, x.unit, x.p, 5000); } }
+      ]
+    });
+    add['028'] = U('028', 'Melody of Fiendish Flower, Takka', DS, 1, {
+      race: 'Human', text: '[ACT](RC)[1/turn]: [COST: [Rest] this unit], put a card from your damage zone into your soul. If you did, put the top card of your deck into your damage zone face down. If the card put into the soul is grade 3 or greater with a different card name from your vanguard, you may Soul-Charge 1.',
+      abilities: [{ kind: 'ACT', zones: ['RC'], oncePerTurn: true, label: 'A damage card to the soul', cost: { restSelf: true }, cond: (g, x) => g.P(x.p).damage.length > 0,
+        resolve: function* (g, x) {
+          const pl = g.P(x.p); const cs = yield* g.selectCards(x.p, pl.damage.map(d => d.c), { title: 'Put a card from your damage zone into your soul', min: 1, max: 1, purpose: 'fromDrop' });
+          for (const c of cs) {
+            const i = pl.damage.findIndex(d => d.c === c); pl.damage.splice(i, 1); g.toZone(x.p, [c], 'soul');
+            const t = pl.deck.shift(); if (t) pl.damage.push({ c: t, faceUp: false });
+            if (g.def(c).grade >= 3 && g.name(c) !== g.name(pl.vc.c)) g.soulCharge(x.p, 1);
+          }
+          g.checkRules();
+        } }]
+    });
+    add['047'] = crit4('047', 'Stem Deviate Dragon', DS, 'Gear Dragon');
+    add['048'] = draw4('048', 'Rouse Wildmaster, Riley', DS, 'Elf');
+    add['049'] = reissue('D-BT02/035', '049');
+    const toSoulN = (g, p) => tfN(g, 'toSoulByAb', p);
+    add['024'] = U('024', 'Showered Applause Dragon', DS, 3, {
+      race: 'Abyss Dragon', clan: 'Pale Moon', verified: false,
+      text: '[AUTO]: When this unit is placed on (RC), if you have a vanguard whose only clan is "Pale Moon", you may put a card from your drop into your soul.\n[CONT](RC): During your turn, if this unit was placed on (RC) from your soul this turn, it gets +5000 (+10000 if your opponent\'s vanguard is grade 3 or greater).',
+      abilities: [{ kind: 'CONT', zones: ['RC'], power: (g, x) => x.targetUnit === x.unit && myTurn(g, x) && x.unit.fromSoulTurn === g.turn ? (oppVG3(g, x) ? 10000 : 5000) : 0 }]
+    });
+    add['025'] = U('025', 'Eerie Fixer Dragon', DS, 2, {
+      race: 'Abyss Dragon', text: DISCARD_TEXT + '\n[CONT](RC): If two or more of your cards were put into your soul by card abilities this turn, this unit gets [Boost].',
+      abilities: [discardCall(), { kind: 'CONT', zones: ['RC'], gainBoost: (g, x) => toSoulN(g, x.p) >= 2 }]
+    });
+    add['064'] = U('064', 'Winsome Clown', DS, 1, { race: 'Warbeast', text: '[CONT](RC): If three or more cards were put into soul by your card abilities this turn, this unit gets +10000.', abilities: [{ kind: 'CONT', zones: ['RC'], power: selfPower(10000, (g, x) => toSoulN(g, x.p) >= 3) }] });
+    add['065'] = U('065', 'Miasmic Beast, Madulla', DS, 1, {
+      race: 'Demon', text: '[ACT](RC)[1/turn]: [COST: SB1 & discard a card from your hand], choose a "Saccharine Bait" in your drop; until end of turn it can be played from your drop (then it goes to the bottom of your deck).\n[AUTO](RC): At the end of your turn, [COST: EB5], draw 1.',
+      abilities: [
+        { kind: 'ACT', zones: ['RC'], oncePerTurn: true, label: 'Saccharine Bait can be played from the drop', cost: { sb: 1, discard: 1 }, cond: (g, x) => g.P(x.p).drop.some(c => g.name(c) === 'Saccharine Bait'),
+          resolve: function* (g, x) { const c = g.P(x.p).drop.find(cc => g.name(cc) === 'Saccharine Bait'); if (c) { c.playFromDrop = g.turn; g.log('Saccharine Bait can be played from the drop this turn.', x.p); } } },
+        { kind: 'AUTO', on: 'endOfTurn', zones: ['RC'], label: 'Draw 1', cost: { eb: 5 }, resolve: function* (g, x) { g.draw(x.p, 1); } }
+      ]
+    });
+    add['066'] = U('066', 'Steam Fighter, Iemsum', DS, 1, {
+      race: 'Gearoid', text: '[AUTO]: When this unit is put on (GC), [COST: EB3], choose one of your opponent\'s attacking vanguards; it gets -5000 until end of turn.',
+      abilities: [{ kind: 'AUTO', on: 'putOnGC', zones: ['GC'], label: 'Attacking vanguard -5000', cost: { eb: 3 }, cond: (g, x) => !!g.battle && g.battle.aUnit === g.P(g.battle.ap).vc,
+        resolve: function* (g, x) { const u = g.battle.aUnit; g.addMod(u, { power: -5000, until: 'turn' }); g.log(g.name(u.c) + ' -5000.', x.p); } }]
+    });
+    add['067'] = ORD('067', 'Saccharine Bait', DS, 3, 'normal', {
+      cost: { cb: 1 }, verified: false,
+      text: 'Normal Order. [COST: CB1] Perform the effect for your vanguard:\n"' + SG + '": until end of turn, your opponent\'s rear-guards lose their [CONT] and [AUTO] abilities. Your opponent chooses up to three units from their drop and calls them to empty (RC). Then draw 1 for every three rear-guards on the field (both players).\n"' + GD + '": if your vanguard was not placed during this turn\'s ride phase, Persona Ride. Then shuffle any number of cards with different grades (no heal or over triggers) from your drop into your deck.',
+      canPlay: (g, x) => vgNamed(g, x.p, 'Sacrifice Glass', 0) || vgNamed(g, x.p, 'Grandogma', 0),
+      play: function* (g, x) {
+        const o = opp(x); const op = g.P(o);
+        if (vgNamed(g, x.p, 'Sacrifice Glass', 0)) {
+          (g.nullRGUntil || (g.nullRGUntil = [-1, -1]))[o] = g.turn;
+          for (let i = 0; i < 3 && g.emptyRC(o).length; i++) {
+            const pool = op.drop.filter(c => isUnit(g, c) && g.def(c).grade <= g.vgGrade(o)); if (!pool.length) break;
+            const cs = yield* g.selectCards(o, pool, { title: 'Call a unit from your drop to an empty circle (' + (i + 1) + '/3)', min: 0, max: 1, purpose: 'callFromDrop' }); if (!cs.length) break;
+            yield* g.callFrom(o, cs[0], 'drop', { from: 'drop', circles: g.emptyRC(o) });
+          }
+          const n = Math.floor((g.rearguards(0).length + g.rearguards(1).length) / 3); if (n) g.draw(x.p, n);
+        } else {
+          if (!g.tf.persona[x.p] && g.P(x.p).vc.rideTurn !== g.turn) { g.tf.persona[x.p] = true; g.log('PERSONA RIDE! Front row +10000 and draw 1.', x.p); g.draw(x.p, 1); }
+          const pl = g.P(x.p); const used = new Set(); const cs = yield* g.selectCards(x.p, pl.drop.filter(c => !['heal', 'over'].includes(g.def(c).trigger)), { title: 'Shuffle cards with different grades from your drop into your deck', min: 0, max: 4, purpose: 'fromDrop' });
+          for (const c of cs) { const gr = g.def(c).grade; if (used.has(gr)) continue; used.add(gr); g.take(pl.drop, c); pl.deck.push(c); }
+          g.shuffle(pl.deck);
+        }
+      }
+    });
+    add['068'] = ORD('068', 'Walk the Dark!', DS, 3, 'blitz', {
+      cost: { eb: 3 }, playFromSoul: true, verified: false,
+      text: 'Blitz Order. You may play this card from your soul. [COST: EB3] Choose one of your attacked units; it gets +15000 until end of that battle. If this card was played from your soul, put it on the bottom of your deck.',
+      canPlay: (g, x) => !!g.battle && g.battle.tp === x.p,
+      play: function* (g, x) { const ts = g.liveTargets(); let u = ts[0]; if (ts.length > 1) { const c = yield* g.chooseUnit(x.p, { filter: s => ts.includes(s.u), title: 'Which attacked unit gets +15000?', purpose: 'defend', alwaysAsk: true }); if (c) u = g.unitAt(x.p, c); } if (u) plusBattle(g, u, x.p, 15000); }
+    });
+    add['093'] = U('093', 'Causal Flare Dragon', DS, 3, {
+      race: 'Gear Dragon', text: '[ACT](RC)[1/turn]: [COST: EB2 & retire another of your rear-guards], Soul-Charge 1, choose one of your opponent\'s rear-guards and retire it, and this unit gets +5000 until end of turn.',
+      abilities: [{ kind: 'ACT', zones: ['RC'], oncePerTurn: true, label: 'Retire one of yours: retire one of theirs, +5000', cost: { eb: 2, retireRG: 1 }, cond: (g, x) => g.rearguards(x.p).length >= 2 && oppRGs(g, x).length > 0,
+        resolve: function* (g, x) { g.soulCharge(x.p, 1); yield* retireOpp(g, x); if (g.circOf(x.p, x.unit)) plusTurn(g, x.unit, x.p, 5000); } }]
+    });
+    add['094'] = U('094', 'Hideous Cycler Dragon', DS, 3, {
+      race: 'Abyss Dragon', text: '[AUTO](RC): When this unit attacks, Soul-Charge 2. Put each trigger unit soul charged this way on the bottom of your deck; this unit gets +5000 until end of that battle for each card put on the bottom.',
+      abilities: [{ kind: 'AUTO', on: 'attack', zones: ['RC'], label: 'Soul-Charge 2', resolve: function* (g, x) {
+        const pl = g.P(x.p); const before = pl.soul.length; g.soulCharge(x.p, 2); const got = pl.soul.slice(before);
+        let n = 0; for (const c of got) if (g.def(c).trigger) { g.take(pl.soul, c); pl.deck.push(c); n++; }
+        if (n) plusBattle(g, x.unit, x.p, 5000 * n);
+      } }]
+    });
+    add['095'] = U('095', 'Enliven Magician', DS, 2, {
+      race: 'Elf', text: '[ACT](RC)[1/turn]: If three or more of your cards were put into your soul at the same time by your card ability this turn, [COST: CB1], draw 1, and this unit gets +5000 until end of turn.',
+      abilities: [{ kind: 'ACT', zones: ['RC'], oncePerTurn: true, label: 'Draw 1, +5000', cost: { cb: 1 }, cond: (g, x) => tfN(g, 'toSoulBatch', x.p) >= 3, resolve: function* (g, x) { g.draw(x.p, 1); plusTurn(g, x.unit, x.p, 5000); } }]
+    });
+    add['096'] = U('096', 'Solid-hit Intense Quake Colossus', DS, 2, {
+      race: 'Gear Colossus', text: '[AUTO]: When this unit is placed on (RC), if your soul has ten or more cards, [COST: EB3], choose one of your opponent\'s front row rear-guards and retire it.',
+      abilities: [{ kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'Retire a front row rear-guard', cost: { eb: 3 }, cond: (g, x) => g.P(x.p).soul.length >= 10 && oppRGs(g, x, r => FRONT_RC.includes(r.circ)).length > 0, resolve: function* (g, x) { yield* retireOpp(g, x, r => FRONT_RC.includes(r.circ)); } }]
+    });
+    add['097'] = U('097', 'Enrapturing Satiation, Chefy', DS, 2, {
+      race: 'Demon', text: '[AUTO]: When this unit is rode upon by "' + SG + '", [COST: SB1], search your deck for up to one "Saccharine Bait", reveal it, put it into your hand, and shuffle your deck.\n[AUTO]: When this unit is placed on (RC), you may put a face-up grade 3 or greater card with "Grandogma" in its card name from your damage zone into your hand. If you did, put a card from your hand into your damage zone.',
+      abilities: [
+        { kind: 'AUTO', on: 'rodeUpon', label: 'Search a Saccharine Bait', cost: { sb: 1 }, cond: (g, x) => g.name(x.newCard) === SG, resolve: function* (g, x) { yield* searchToHand(g, x.p, c => g.name(c) === 'Saccharine Bait', 'Put a Saccharine Bait into your hand'); } },
+        { kind: 'AUTO', on: 'placedRC', zones: ['RC'], optional: true, label: 'Grandogma from damage to hand', cond: (g, x) => g.P(x.p).damage.some(d => d.faceUp && g.name(d.c).includes('Grandogma')),
+          resolve: function* (g, x) {
+            const pl = g.P(x.p); const i = pl.damage.findIndex(d => d.faceUp && g.name(d.c).includes('Grandogma')); if (i < 0) return;
+            const c = pl.damage.splice(i, 1)[0].c; pl.hand.push(c);
+            const h = yield* g.selectCards(x.p, pl.hand.filter(cc => cc !== c), { title: 'Put a card from your hand into your damage zone', min: 1, max: 1, purpose: 'discard' });
+            for (const cc of h) { g.take(pl.hand, cc); pl.damage.push({ c: cc, faceUp: true }); }
+          } }
+      ]
+    });
+    add['098'] = U('098', 'Chant of Cursed Blotch, Remias', DS, 2, { race: 'Human', power: 8000, text: BEHIND_TEXT, abilities: behindAbs });
+    add['099'] = U('099', 'Welcoming Flowerbasket, Hoppop', DS, 1, {
+      race: 'Human', text: '[AUTO](VC): At the beginning of your ride phase, you may ride an "Enrapturing Satiation, Chefy" from your ride deck as [Stand]. If you did, both fighters draw 1, and you cannot ride again this turn.',
+      abilities: [{ kind: 'AUTO', on: 'rideStart', zones: ['VC'], optional: true, label: 'Ride Chefy from the ride deck', cond: (g, x) => g.P(x.p).rideDeck.some(c => g.name(c) === 'Enrapturing Satiation, Chefy'),
+        resolve: function* (g, x) {
+          const pl = g.P(x.p); const c = pl.rideDeck.find(cc => g.name(cc) === 'Enrapturing Satiation, Chefy'); if (!c) return;
+          yield* g.rideFrom(x.p, c, 'rideDeck', { stand: true }); g.draw(x.p, 1); g.draw(opp(x), 1); (g.tf.noRide || (g.tf.noRide = [false, false]))[x.p] = true;
+        } }]
+    });
+    add['100'] = U('100', 'Shady Instigator', DS, 1, { race: 'Demon', text: '[AUTO]: When this unit is placed on (RC) from hand, [COST: SB3], draw 1, and this unit gets +2000 until end of turn.',
+      abilities: [{ kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'Draw 1, +2000', cost: { sb: 3 }, cond: (g, x) => x.from === 'hand', resolve: function* (g, x) { g.draw(x.p, 1); plusTurn(g, x.unit, x.p, 2000); } }] });
+    add['101'] = U('101', 'Innocent Invitation, Lalalapococo', DS, 0, { race: 'Demon', text: G0TEXT, abilities: [firstVanguardDraw] });
+    add['007'] = U('007', 'Silver Thorn Dragon Empress, Venus Luquier', DS, 3, {
+      race: 'Elf',
+      text: '[CONT](VC): During your turn, if your soul has "Silver Thorn Dragon Tamer, Luquier", this unit gets +5000. If your opponent\'s vanguard is grade 3 or greater, all of your front row units get +5000 instead.\n[ACT](VC)[1/turn]: [COST: EB3 & put a card from your hand into your soul], call any number of grade 3 or less units with different grades from your soul to (RC).\n[AUTO](VC): When this unit attacks, [COST: put two of your rear-guards into your soul], draw 1, and this unit gets +5000 until end of that battle. If your opponent\'s vanguard is grade 3 or greater, it also gets critical +1 until end of that battle.',
+      abilities: [
+        { kind: 'CONT', zones: ['VC'], power: (g, x) => { if (!myTurn(g, x) || !g.P(x.p).soul.some(c => g.name(c) === 'Silver Thorn Dragon Tamer, Luquier')) return 0; return oppVG3(g, x) ? (['VC', 'FL', 'FR'].includes(x.target) ? 5000 : 0) : (x.targetUnit === x.unit ? 5000 : 0); } },
+        { kind: 'ACT', zones: ['VC'], oncePerTurn: true, label: 'Call units with different grades from the soul', cost: { eb: 3, handToSoul: 1 },
+          resolve: function* (g, x) {
+            const pl = g.P(x.p); const used = new Set();
+            for (let i = 0; i < 4; i++) {
+              const pool = pl.soul.filter(c => isUnit(g, c) && g.def(c).grade <= 3 && !used.has(g.def(c).grade)); if (!pool.length) break;
+              const cs = yield* g.selectCards(x.p, pool, { title: 'Call a unit from your soul (different grades)', min: 0, max: 1, purpose: 'callFromSoul' }); if (!cs.length) break;
+              used.add(g.def(cs[0]).grade); yield* g.callFrom(x.p, cs[0], 'soul', { from: 'soul' });
+            }
+          } },
+        { kind: 'AUTO', on: 'attack', zones: ['VC'], label: 'Two rear-guards to the soul: draw 1, +5000', cost: { otherToSoul: 2 },
+          resolve: function* (g, x) { g.draw(x.p, 1); g.addMod(x.unit, { power: 5000, crit: oppVG3(g, x) ? 1 : 0, until: 'battle' }); g.log(g.name(x.unit.c) + ' +5000' + (oppVG3(g, x) ? ' and critical +1.' : '.'), x.p); } }
+      ]
+    });
+    add['008'] = U('008', 'Illusory Lantern Demonic Lady, Forcalor', DS, 1, {
+      race: 'Demon', text: '[AUTO]: When this unit is placed on (RC) from hand, Energy-Charge 1.\n[AUTO](RC): At the end of the battle this unit boosted, if you paid EB3 or more at once for a cost this turn, [COST: retire this unit], draw 1.',
+      abilities: [
+        { kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'Energy-Charge 1', cond: (g, x) => x.from === 'hand', resolve: function* (g, x) { g.energyCharge(x.p, 1); } },
+        { kind: 'AUTO', on: 'boostEnd', zones: ['RC'], optional: true, label: 'Retire this: draw 1', cost: { retireSelf: true }, cond: (g, x) => tfN(g, 'bigEB', x.p) >= 3, resolve: function* (g, x) { g.draw(x.p, 1); } }
+      ]
+    });
+
+    /* ======================= Brandt Gate ======================= */
+    const dRobo = (g, x) => vgNamed(g, x.p, 'Dimensional Robo', 0);
+    const daiy = vgHas('Daiyusha');
+    const fromSoulByAb = x => x.from === 'soul';
+    add['011'] = U('011', 'Super Dimensional Robo, Daiyusha', BG, 3, {
+      race: 'Battleroid',
+      text: '[AUTO](VC)[1/turn]: When this unit attacks, [COST: CB1], draw 1. If your opponent\'s vanguard is grade 3 or greater, choose any number of your units with different card names that contain "Dimensional Robo"; they get +5000 until end of turn.\n[AUTO](VC)[1/turn]: At the end of the battle this unit attacked, [COST: put a card from your hand into your soul], [Stand] this unit, and it gets drive -2 until end of turn. Then, if your bind zone has no "Dimensional Robo, Goyusha" and you persona rode this turn, you may [COST: bind a "Dimensional Robo, Goyusha" from your soul] to give it drive +1 until end of turn.',
+      abilities: [
+        { kind: 'AUTO', on: 'attack', zones: ['VC'], oncePerTurn: true, label: 'Draw 1, Dimensional Robos +5000', cost: { cb: 1 },
+          resolve: function* (g, x) {
+            g.draw(x.p, 1); if (!oppVG3(g, x)) return; const seen = new Set();
+            for (const s of g.units(x.p)) { const n = g.name(s.u.c); if (n.includes('Dimensional Robo') && !seen.has(n)) { seen.add(n); g.addMod(s.u, { power: 5000, until: 'turn' }); } }
+            g.log(seen.size + ' Dimensional Robo unit' + (seen.size === 1 ? '' : 's') + ' +5000.', x.p);
+          } },
+        { kind: 'AUTO', on: 'battleEndVC', zones: ['VC'], oncePerTurn: true, label: 'Stand this unit (drive -2)', cost: { handToSoul: 1 },
+          resolve: function* (g, x) {
+            g.stand(x.unit); g.addMod(x.unit, { drive: -2, until: 'turn' }); g.log(g.name(x.unit.c) + ' stands (drive -2).', x.p);
+            const pl = g.P(x.p);
+            if (!pl.bind.some(c => g.name(c) === 'Dimensional Robo, Goyusha') && g.tf.persona[x.p] && pl.soul.some(c => g.name(c) === 'Dimensional Robo, Goyusha') && (yield* g.yesno(x.p, 'Bind a Goyusha from your soul for drive +1?', 'ability'))) {
+              const c = pl.soul.find(cc => g.name(cc) === 'Dimensional Robo, Goyusha'); g.take(pl.soul, c); pl.bind.push(c); g.addMod(x.unit, { drive: 1, until: 'turn' }); g.log('Drive +1.', x.p);
+            }
+            yield* g._flushStood();
+          } }
+      ]
+    });
+    add['012'] = U('012', 'Super Dimensional Robo, Dailady', BG, 2, {
+      race: 'Battleroid',
+      text: '[AUTO]: When this unit is placed on (RC), if you have a vanguard with "Dimensional Robo" in its card name, [COST: CB1], search your deck for up to one Base, reveal it, put it into your hand, and shuffle your deck.\n[AUTO](RC): When this unit attacks a grade 3 or greater unit, if your order zone has two or more Bases, this unit gets +10000 until end of that battle.',
+      abilities: [
+        { kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'Search a Base', cost: { cb: 1 }, cond: (g, x) => dRobo(g, x) && g.P(x.p).deck.some(c => g.def(c).base), resolve: function* (g, x) { yield* searchToHand(g, x.p, c => !!g.def(c).base, 'Put a Base into your hand'); } },
+        { kind: 'AUTO', on: 'attack', zones: ['RC'], label: 'This unit +10000', cond: (g, x) => !!g.battle && g.battle.targets.some(u => g.def(u.c).grade >= 3) && g.P(x.p).orderZone.filter(c => g.def(c).base).length >= 2, resolve: function* (g, x) { plusBattle(g, x.unit, x.p, 10000); } }
+      ]
+    });
+    add['030'] = U('030', 'Refractile Dragon', BG, 2, { race: 'Space Dragon', text: DISCARD_TEXT + '\n[CONT](RC): If a card was put into your order zone this turn, this unit gets [Boost].', abilities: [discardCall(), { kind: 'CONT', zones: ['RC'], gainBoost: (g, x) => !!tfN(g, 'ozPut', x.p) }] });
+    add['031'] = U('031', 'Dimensional Robo, Daimariner', BG, 1, {
+      race: 'Battleroid', text: '[AUTO]: When this card is discarded from your hand during your turn, you may put it into your soul.\n[AUTO]: When this unit is placed on (RC) from your soul by your card\'s ability, if you have a grade 3 or greater vanguard with "Daiyusha" in its card name, this unit gets +2000 until end of turn, and your opponent cannot intercept this turn.',
+      abilities: [
+        { kind: 'AUTO', on: 'discarded', optional: true, label: 'Put this card into the soul', cond: (g, x) => g.active === x.p && g.P(x.p).drop.includes(x.card), resolve: function* (g, x) { const pl = g.P(x.p); if (pl.drop.includes(x.card)) { g.take(pl.drop, x.card); g.toZone(x.p, [x.card], 'soul'); } } },
+        { kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: '+2000, opponent cannot intercept', cond: (g, x) => fromSoulByAb(x) && daiy(g, x), resolve: function* (g, x) { plusTurn(g, x.unit, x.p, 2000); (g.tf.noIntercept || (g.tf.noIntercept = [false, false]))[opp(x)] = true; } }
+      ]
+    });
+    add['050'] = crit4('050', 'Patrol Robo, Dekarcop', BG, 'Battleroid');
+    add['051'] = draw4('051', 'Ameliorate Connector', BG, 'Cyberoid');
+    add['052'] = reissue('D-BT02/042', '052');
+    add['069'] = U('069', 'Dimensional Robo, Daidragon', BG, 2, {
+      race: 'Battleroid', text: '[AUTO]: When this unit is rode upon by a grade 3 card with "Daiyusha" in its card name, call this card to (RC).\n[AUTO]: When this unit is placed on (RC) from your soul by your card\'s ability, if you have a grade 3 or greater vanguard with "Daiyusha" in its card name, it gets +5000 and, until the end of your opponent\'s next turn, "[AUTO](RC): When your vanguard is attacked, [COST: retire this unit], choose one of your vanguards; it gets +15000 until end of that battle."',
+      abilities: [
+        { kind: 'AUTO', on: 'rodeUpon', label: 'Call this card from the soul', cond: (g, x) => g.def(x.newCard).grade === 3 && g.name(x.newCard).includes('Daiyusha') && g.P(x.p).soul.includes(x.oldCard),
+          resolve: function* (g, x) { if (g.P(x.p).soul.includes(x.oldCard)) yield* g.callFrom(x.p, x.oldCard, 'soul', { from: 'soul' }); } },
+        { kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: '+5000 and a guard ability', cond: (g, x) => fromSoulByAb(x) && daiy(g, x),
+          resolve: function* (g, x) {
+            plusTurn(g, x.unit, x.p, 5000);
+            g.grant(x.unit, { kind: 'AUTO', on: 'vcAttacked', zones: ['RC'], label: 'Retire this: your vanguard +15000', cost: { retireSelf: true }, cond: (gg, xx) => !!gg.battle && gg.battle.tp === xx.p,
+              resolve: function* (gg, xx) { const v = gg.P(xx.p).vc; if (v) plusBattle(gg, v, xx.p, 15000); } }, 'fight');
+          } }
+      ]
+    });
+    add['073'] = ORD('073', 'Super Dimensional Fortress, Daibase', BG, 0, 'set', {
+      base: true,
+      text: 'Set Order (Base).\n[ACT](Order Zone): If you have a vanguard with "Dimensional Robo" in its card name, [COST: [Rest] this card], Energy-Charge 1, and put up to one grade 2 or less card with "Dimensional Robo" in its card name from your drop into your soul. If this card was put into your order zone this turn, you may search your deck for it instead (and shuffle).\n[ACT](Order Zone): If you have a vanguard with "Dimensional Robo" in its card name, [COST: EB2 & [Rest] this card], call up to one grade 2 or less card with "Dimensional Robo" in its card name from your soul to (RC).',
+      abilities: [
+        { kind: 'ACT', zones: ['order'], label: 'Energy-Charge 1, a Dimensional Robo to the soul', cost: { restOZ: true }, cond: dRobo,
+          resolve: function* (g, x) {
+            g.energyCharge(x.p, 1); const pl = g.P(x.p); const f = c => isUnit(g, c) && g.def(c).grade <= 2 && g.name(c).includes('Dimensional Robo');
+            const fresh = x.card.enteredTurn === g.turn;
+            const pool = pl.drop.filter(f).concat(fresh ? pl.deck.filter(f) : []);
+            const cs = yield* g.selectCards(x.p, pool, { title: 'Put a Dimensional Robo into your soul' + (fresh ? ' (from your drop or deck)' : ''), min: 0, max: 1, purpose: 'search' });
+            for (const c of cs) { const fromDeck = pl.deck.includes(c); g.take(fromDeck ? pl.deck : pl.drop, c); g.toZone(x.p, [c], 'soul'); if (fromDeck) g.shuffle(pl.deck); }
+          } },
+        { kind: 'ACT', zones: ['order'], label: 'Call a Dimensional Robo from the soul', cost: { eb: 2, restOZ: true }, cond: (g, x) => dRobo(g, x) && g.P(x.p).soul.some(c => isUnit(g, c) && g.def(c).grade <= 2 && g.name(c).includes('Dimensional Robo')),
+          resolve: function* (g, x) { const pl = g.P(x.p); const cs = yield* g.selectCards(x.p, pl.soul.filter(c => isUnit(g, c) && g.def(c).grade <= Math.min(2, g.vgGrade(x.p)) && g.name(c).includes('Dimensional Robo')), { title: 'Call a Dimensional Robo from your soul', min: 0, max: 1, purpose: 'callFromSoul' }); for (const c of cs) yield* g.callFrom(x.p, c, 'soul', { from: 'soul' }); } }
+      ]
+    });
+    add['072'] = ORD('072', 'Pelicca Express', BG, 2, 'blitz', {
+      cost: { dropToBottom: { n: 1, label: 'put a set order from your drop on the bottom of your deck', filter: (g, c) => g.def(c).order === 'set' } },
+      text: 'Blitz Order. [COST: put a set order from your drop on the bottom of your deck] Choose one of your attacked units; it gets +20000 until end of that battle.',
+      canPlay: (g, x) => !!g.battle && g.battle.tp === x.p,
+      play: function* (g, x) { const ts = g.liveTargets(); let u = ts[0]; if (ts.length > 1) { const c = yield* g.chooseUnit(x.p, { filter: s => ts.includes(s.u), title: 'Which attacked unit gets +20000?', purpose: 'defend', alwaysAsk: true }); if (c) u = g.unitAt(x.p, c); } if (u) plusBattle(g, u, x.p, 20000); }
+    });
+    add['102'] = U('102', 'Traction Conversion, Tractrailer', BG, 3, {
+      race: 'Battleroid', text: '[AUTO](RC): When this unit attacks, discard the top card of your deck. If a trigger unit was discarded, put a blitz or set order from your drop into your hand. If you did not, this unit gets +5000 until end of that battle.',
+      abilities: [{ kind: 'AUTO', on: 'attack', zones: ['RC'], label: 'Discard the top card: an order to hand or +5000', resolve: function* (g, x) {
+        const pl = g.P(x.p); const c = pl.deck.shift(); if (!c) return; pl.drop.push(c); g.log(g.names[x.p] + ' discards ' + g.name(c) + ' from the top of the deck.', x.p); g.checkRules();
+        if (g.def(c).trigger) { const cs = yield* g.selectCards(x.p, pl.drop.filter(cc => g.def(cc).type === 'order' && ['blitz', 'set'].includes(g.def(cc).order)), { title: 'Put a blitz or set order from your drop into your hand', min: 0, max: 1, purpose: 'fromDrop' }); if (cs.length) { g.take(pl.drop, cs[0]); pl.hand.push(cs[0]); return; } }
+        plusBattle(g, x.unit, x.p, 5000);
+      } }]
+    });
+    add['103'] = U('103', 'Amazing Fist Dragon, Edorwyn Dragon', BG, 2, {
+      race: 'Space Dragon', text: '[AUTO]: When this unit is placed on (RC), if your order zone has two or more set orders, [COST: EB4], choose one of your opponent\'s front row rear-guards and retire it.',
+      abilities: [{ kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'Retire a front row rear-guard', cost: { eb: 4 }, cond: (g, x) => setOrders(g, x.p) >= 2 && oppRGs(g, x, r => FRONT_RC.includes(r.circ)).length > 0, resolve: function* (g, x) { yield* retireOpp(g, x, r => FRONT_RC.includes(r.circ)); } }]
+    });
+    add['105'] = U('105', 'Stratosphere Dragon', BG, 2, { race: 'Cyber Dragon', power: 8000, text: BEHIND_TEXT, abilities: behindAbs });
+    add['106'] = U('106', 'Alleskonner Held', BG, 1, { race: 'Battleroid', text: '[AUTO](RC): At the end of the battle this unit boosted, if your order zone has two or more set orders, [COST: retire this unit], choose one of your vanguards; it gets +5000 until end of turn.',
+      abilities: [{ kind: 'AUTO', on: 'boostEnd', zones: ['RC'], optional: true, label: 'Retire this: your vanguard +5000', cost: { retireSelf: true }, cond: (g, x) => setOrders(g, x.p) >= 2, resolve: function* (g, x) { const v = g.P(x.p).vc; if (v) plusTurn(g, v, x.p, 5000); } }] });
+    add['107'] = U('107', 'Dimensional Robo, Daibattles', BG, 1, {
+      race: 'Battleroid', verified: false,
+      text: '[ACT](Soul)[1/turn]: If your vanguard is "Dimensional Robo, Daidragon", your opponent\'s vanguard is grade 2 or greater, and your soul has "Dimensional Robo, Goyusha", "Dimensional Robo, Dailander", and "Dimensional Robo, Daimariner", [COST: put a card from your hand into your soul], ride a "Super Dimensional Robo, Daiyusha" from your ride deck as [Stand]. (Not automated.)\n[AUTO]: When this unit is placed on (RC) from your soul by your card\'s ability, if you have a grade 3 or greater vanguard with "Daiyusha" in its card name and your opponent\'s vanguard is grade 3 or greater, your vanguard gets critical +1 until end of turn (its original critical becomes 2).',
+      abilities: [{ kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'Your vanguard critical 2', cond: (g, x) => fromSoulByAb(x) && daiy(g, x) && oppVG3(g, x) && !g.tf.daibattles,
+        resolve: function* (g, x) { const v = g.P(x.p).vc; g.tf.daibattles = true; g.addMod(v, { crit: 1, until: 'turn' }); g.log(g.name(v.c) + ' critical +1.', x.p); } }]
+    });
+    add['108'] = U('108', 'Dimensional Robo, Dailander', BG, 1, {
+      race: 'Battleroid', text: '[AUTO]: When this unit is placed on (VC), search your deck for up to one Base, reveal it, put it into your hand, and shuffle your deck.\n[AUTO]: When this unit is placed on (RC) from your soul by your card\'s ability, if you have a grade 3 or greater vanguard with "Daiyusha" in its card name, all of your vanguards and this unit get +5000 until end of turn.',
+      abilities: [
+        { kind: 'AUTO', on: 'placedVC', zones: ['VC'], label: 'Search a Base', cond: (g, x) => g.P(x.p).deck.some(c => g.def(c).base), resolve: function* (g, x) { yield* searchToHand(g, x.p, c => !!g.def(c).base, 'Put a Base into your hand'); } },
+        { kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'Your vanguard and this unit +5000', cond: (g, x) => fromSoulByAb(x) && daiy(g, x), resolve: function* (g, x) { for (const u of [g.P(x.p).vc, x.unit]) g.addMod(u, { power: 5000, until: 'turn' }); g.log('Your vanguard and ' + g.name(x.unit.c) + ' +5000.', x.p); } }
+      ]
+    });
+    add['109'] = U('109', 'Spectroscopic Binary Star, Lady Archer', BG, 1, { race: 'Cyberoid', text: '[CONT](RC): During your turn, if your opponent\'s vanguard is grade 3 or greater and your order zone has three or more set orders, this unit gets +10000.', abilities: [{ kind: 'CONT', zones: ['RC'], power: selfPower(10000, (g, x) => myTurn(g, x) && oppVG3(g, x) && setOrders(g, x.p) >= 3) }] });
+    add['110'] = U('110', 'Dimensional Robo, Goyusha', BG, 0, { race: 'Battleroid', text: G0TEXT, abilities: [firstVanguardDraw] });
+    // Arkhite / Monsters (Researches and Monster cards in the order zone are not in the simulator)
+    add['009'] = U('009', 'Innocent Monster in Paradise, Arkhite', BG, 3, {
+      race: 'Human', verified: false,
+      text: '[CONT](VC): This unit is also regarded as "Monster Creator, Arkhite".\n[ACT](VC)[1/turn]: [COST: EB2], put up to three cards with "Monster" in their card names from your drop into your order zone.\n[AUTO](VC): When your rear-guard with "Monster" in its card name is placed, [COST: put a card with the same name from your order zone into your drop], that unit gets +10000 until end of turn.\n[AUTO](VC): When this unit attacks a vanguard, [COST: CB1], call up to two cards with different "Monster" card names from your order zone to (RC).' + NOT_AUTO
+    });
+    add['010'] = U('010', 'Light Ray Monster, Rayviris', BG, 3, {
+      race: 'Alien', text: '[AUTO]: When this unit is placed on (RC) by the ability of your vanguard with "Arkhite" in its card name, it gets until end of turn "[AUTO](RC): When this unit attacks, [COST: CB1], your opponent\'s vanguard gets -5000; if it is grade 3 or greater, this unit gets +10000 and critical +1 until end of turn." (Not automated.)\n[CONT](RC): This unit cannot be chosen by your opponent\'s card effects.',
+      abilities: [{ kind: 'CONT', zones: ['RC'], oppImmune: () => true }]
+    });
+    add['029'] = U('029', 'Armed Arms, "Drill"', BG, 2, { race: 'Workeroid', verified: false, text: '[AUTO](VC/RC): When this unit attacks, [COST: put an "Armed Arms" card from your drop into your soul]: (VC) if it has two or more attached cards, critical +1 until end of that battle; (RC) +5000 until end of that battle.',
+      abilities: [{ kind: 'AUTO', on: 'attack', zones: ['RC'], optional: true, label: '+5000', cond: (g, x) => g.P(x.p).drop.some(c => g.name(c).includes('Armed Arms')),
+        resolve: function* (g, x) { const pl = g.P(x.p); const c = pl.drop.find(cc => g.name(cc).includes('Armed Arms')); if (!c) return; g.take(pl.drop, c); g.toZone(x.p, [c], 'soul'); plusBattle(g, x.unit, x.p, 5000); } }] });
+    add['032'] = U('032', 'Repair Robo, Runny', BG, 1, { race: 'Workeroid', verified: false, text: '[AUTO]: When this unit is placed on (RC), [COST: SB1], look at the top seven cards of your deck, choose up to two cards with "Armed Arms" in their card names, reveal them, put one into your hand, discard the rest, and shuffle your deck.\n[AUTO](RC): When your grade 3 or greater vanguard with "Silhouette" in its card name attacks, [COST: SB1 & retire this unit], your opponent must call two or more cards at once to guard that battle.' + NOT_AUTO });
+    add['070'] = U('070', 'Armor Scissors Monster, Forvex', BG, 1, { race: 'Alien', text: '[CONT](GC): If your order zone has two or more Researches, this unit gets shield +5000.\n[AUTO](RC): At the end of the battle this unit boosted, if you have a vanguard with "Arkhite" in its card name, [COST: SB1], return this unit to your hand.',
+      abilities: [{ kind: 'AUTO', on: 'boostEnd', zones: ['RC'], optional: true, label: 'Return this unit to hand', cost: { sb: 1 }, cond: (g, x) => vgNamed(g, x.p, 'Arkhite', 0), resolve: function* (g, x) { const c = g.circOf(x.p, x.unit); if (c) g.removeUnit(x.p, c, 'hand'); } }] });
+    add['071'] = U('071', 'Support Drone, Manny', BG, 1, { race: 'Workeroid', verified: false, text: '[AUTO]: When this unit is put on (GC), if you have a vanguard with "Silhouette" in its card name, look at the top five cards of your deck, call any number of cards with different "Armed Arms" card names to (GC), and shuffle your deck. If you did not call, this unit gets shield +5000 until end of that battle.' + NOT_AUTO });
+    add['104'] = U('104', 'Thunder Claw Monster, Relamgarra', BG, 2, { race: 'Alien', text: '[AUTO](RC): When this unit attacks a grade 3 or greater vanguard, if your order zone has a Research, this unit gets +5000 until end of that battle.\n[AUTO](RC): At the end of the battle this unit attacked, if you have a grade 3 or greater vanguard with "Arkhite" in its card name, you may [COST: retire this unit] to draw 1.',
+      abilities: [{ kind: 'AUTO', on: 'battleEnd', zones: ['RC'], optional: true, label: 'Retire this: draw 1', cost: { retireSelf: true }, cond: vgHas('Arkhite'), resolve: function* (g, x) { g.draw(x.p, 1); } }] });
+
+    /* ======================= Keter Sanctuary ======================= */
+    const TRYST = 'Monitored Tryst';
+    const trysts = (g, p) => g.P(p).orderZone.filter(c => g.name(c) === TRYST);
+    const undercover = c => /Undercover/.test(c);
+    const ucVG = (g, x) => vgNamed(g, x.p, 'Undercover', 0);
+    add['013'] = U('013', 'Poison Knight of Silence Undercover, Mordalion', KS, 3, {
+      race: 'Elf',
+      text: '[CONT](VC): During your turn, if your order zone has three or more "Monitored Tryst", your units with "Undercover" in their card names get +5000.\n[ACT](VC)[1/turn]: [COST: EB2], look at the top seven cards of your deck, choose up to as many cards as "Monitored Tryst" without an undercover gauge in your order zone, put one face down as the undercover gauge of each of them, and shuffle your deck.\n[AUTO](VC): When this unit attacks, [COST: CB1], choose up to two cards with "Undercover" in their card names from your undercover gauges and call them to (RC) in this unit\'s column (the second one to any circle).',
+      abilities: [
+        { kind: 'CONT', zones: ['VC'], power: (g, x) => myTurn(g, x) && trysts(g, x.p).length >= 3 && x.targetUnit && undercover(g.name(x.targetUnit.c)) ? 5000 : 0 },
+        { kind: 'ACT', zones: ['VC'], oncePerTurn: true, label: 'Undercover gauges for the empty Monitored Trysts', cost: { eb: 2 }, cond: (g, x) => trysts(g, x.p).some(c => !c.gauge),
+          resolve: function* (g, x) {
+            const empty = trysts(g, x.p).filter(c => !c.gauge);
+            yield* lookTop(g, x.p, 7, { title: 'Choose up to ' + empty.length + ' cards to become undercover gauges', pick: () => true, max: empty.length, shuffle: true, purpose: 'search',
+              take: function* (c) { const t = empty.shift(); if (!t) return; g.take(g.P(x.p).trig, c); t.gauge = c; g.log('A card becomes the undercover gauge of a Monitored Tryst.', x.p); } });
+          } },
+        { kind: 'AUTO', on: 'attack', zones: ['VC'], label: 'Call Undercover cards from the gauges', cost: { cb: 1 }, cond: (g, x) => trysts(g, x.p).some(c => c.gauge && isUnit(g, c.gauge) && undercover(g.name(c.gauge))),
+          resolve: function* (g, x) {
+            const holders = trysts(g, x.p).filter(c => c.gauge && isUnit(g, c.gauge) && undercover(g.name(c.gauge)) && g.def(c.gauge).grade <= g.vgGrade(x.p));
+            const cs = yield* g.selectCards(x.p, holders.map(c => c.gauge), { title: 'Call up to two Undercover cards from your undercover gauges', min: 0, max: 2, purpose: 'callFromDrop' });
+            for (const [i, c] of cs.entries()) { const h = holders.find(t => t.gauge === c); h.gauge = null; g.P(x.p).trig.push(c); yield* g.callFrom(x.p, c, 'trig', { from: 'gauge' }); }
+          } }
+      ]
+    });
+    add['078'] = ORD('078', TRYST, KS, 2, 'set', {
+      dropPlayable: true,
+      text: 'Set Order. Play only if you have a vanguard with "Undercover" in its card name. You may play this card from your drop.\n[AUTO]: When this card is put into your order zone, look at the top seven cards of your deck, choose up to one, put it face down as this card\'s undercover gauge, and shuffle your deck.',
+      canPlay: (g, x) => ucVG(g, x),
+      abilities: [{ kind: 'AUTO', on: 'enterOrderZone', label: 'Undercover gauge from the top seven', cond: (g, x) => x.subject === x.self,
+        resolve: function* (g, x) { const me = x.card; yield* lookTop(g, x.p, 7, { title: 'Choose a card to become this Monitored Tryst\'s undercover gauge', pick: () => true, shuffle: true, purpose: 'search', take: function* (c) { g.take(g.P(x.p).trig, c); me.gauge = c; } }); } }]
+    });
+    add['014'] = U('014', 'Knight of Abruptness Undercover, Deira', KS, 2, {
+      race: 'Elf', text: '[AUTO]: When this unit is placed on (RC), if you have a vanguard with "Undercover" in its card name, [COST: CB1], look at the top five cards of your deck, choose up to one card with "Undercover" in its card name, reveal it, put it into your hand, and shuffle your deck.\n[AUTO](RC): When this unit attacks a grade 3 or greater unit, if you have a vanguard with "Undercover" in its card name, [COST: SB1], this unit gets +10000 until end of that battle.',
+      abilities: [
+        { kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'Look at the top five for an Undercover card', cost: { cb: 1 }, cond: ucVG,
+          resolve: function* (g, x) { yield* lookTop(g, x.p, 5, { title: 'Put up to one Undercover card into your hand', pick: c => undercover(g.name(c)), shuffle: true, purpose: 'search', take: function* (c) { yield* toHandFromTrig(g, x.p, c); } }); } },
+        { kind: 'AUTO', on: 'attack', zones: ['RC'], label: 'This unit +10000', cost: { sb: 1 }, cond: (g, x) => ucVG(g, x) && !!g.battle && g.battle.targets.some(u => g.def(u.c).grade >= 3), resolve: function* (g, x) { plusBattle(g, x.unit, x.p, 10000); } }
+      ]
+    });
+    add['033'] = U('033', 'Knight of Blackness of Yore Undercover, Obscudeid', KS, 3, {
+      race: 'Human', verified: false,
+      text: '[ACT](undercover gauge): If this card is an undercover gauge, [COST: SB1], call it to your back row center (RC).\n[CONT](RC): If you have a grade 3 or greater vanguard with "Undercover" in its card name, this unit can attack from the back row center and gets +10000.\n[AUTO](RC): When this unit attacks from the back row center, if your opponent\'s vanguard is grade 3 or greater, [COST: SB1], it performs a drive check this battle (drive 1). At the end of that battle, put this unit on the bottom of your deck.',
+      abilities: [
+        { kind: 'ACT', zones: ['gauge'], label: 'Call this gauge to the back row center', cost: { sb: 1 }, cond: (g, x) => g.vgGrade(x.p) >= 3,
+          resolve: function* (g, x) { const h = g.P(x.p).orderZone.find(c => c.gauge === x.card); if (!h) return; h.gauge = null; g.P(x.p).trig.push(x.card); yield* g.callFrom(x.p, x.card, 'trig', { from: 'gauge', circles: ['BC'] }); } },
+        { kind: 'CONT', zones: ['RC'], power: selfPower(10000, (g, x) => vgNamed(g, x.p, 'Undercover')), backAttack: (g, x) => x.circ === 'BC' && vgNamed(g, x.p, 'Undercover') },
+        { kind: 'AUTO', on: 'attack', zones: ['RC'], label: 'Drive check from the back row', cost: { sb: 1 }, cond: (g, x) => x.circ === 'BC' && oppVG3(g, x) && vgNamed(g, x.p, 'Undercover') && !g.tf.rcDrive[x.p],
+          resolve: function* (g, x) {
+            g.tf.rcDrive[x.p] = true; g.log(g.name(x.unit.c) + ' will drive check this battle.', x.p);
+            g.grant(x.unit, { kind: 'AUTO', on: 'battleEnd', zones: ['RC'], label: 'To the bottom of the deck', resolve: function* (gg, xx) { gg.tf.rcDrive[xx.p] = false; const c = gg.circOf(xx.p, xx.unit); if (c) gg.removeUnit(xx.p, c, 'bottom'); } }, 'battle');
+          } }
+      ]
+    });
+    add['053'] = crit4('053', 'Blade Feather Dragon', KS, 'Cosmo Dragon');
+    add['054'] = draw4('054', 'Protection Magic, Prorobi', KS, 'Human');
+    add['055'] = reissue('D-BT02/048', '055');
+    add['034'] = U('034', 'Exalted Dragon', KS, 2, { race: 'Cosmo Dragon', text: DISCARD_TEXT + '\n[CONT](RC): If another of your units was placed by your card\'s ability this turn, this unit gets [Boost].', abilities: [discardCall(), { kind: 'CONT', zones: ['RC'], gainBoost: (g, x) => !!tfN(g, 'calledNonHand', x.p) }] });
+    add['015'] = U('015', 'Magic of Threaded Connections, Peraram', KS, 1, {
+      race: 'Human', text: '[AUTO]: When this unit is placed on (RC) during your main phase, [COST: CB1], call up to one card with a grade equal to or less than your vanguard\'s from your hand to (RC). If you called, draw 1.\n[CONT](RC): During your turn, if your vanguard is grade 3 or greater and you have four or more units, this unit gets +5000.',
+      abilities: [
+        { kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'Call a card from hand, draw 1', cost: { cb: 1 }, cond: (g, x) => g.phase === 'main' && g.P(x.p).hand.some(c => isUnit(g, c) && g.def(c).grade <= g.vgGrade(x.p)),
+          resolve: function* (g, x) { const pl = g.P(x.p); const cs = yield* g.selectCards(x.p, pl.hand.filter(c => isUnit(g, c) && g.def(c).grade <= g.vgGrade(x.p)), { title: 'Peraram: call up to one card from your hand', min: 0, max: 1, purpose: 'callFromHand' }); for (const c of cs) yield* g.callFrom(x.p, c, 'hand', { from: 'hand' }); if (cs.length) g.draw(x.p, 1); } },
+        { kind: 'CONT', zones: ['RC'], power: selfPower(5000, (g, x) => myTurn(g, x) && g.vgGrade(x.p) >= 3 && g.units(x.p).length >= 4) }
+      ]
+    });
+    add['035'] = U('035', 'Freezing Magic, Froros', KS, 2, { race: 'Human', clan: 'Genesis', verified: false, text: '[AUTO]: When this unit is placed on (RC), if you have a grade 3 or greater vanguard with "Minerva" in its card name, [COST: SB2], choose two normal units other than sentinels with the same card name from your drop; put one into your hand and the other into your deck, and shuffle.' + NOT_AUTO });
+    add['036'] = U('036', 'Nosedive Falcon', KS, 1, { race: 'High Beast', verified: false, text: '[CONT](RC): If your grade 3 or greater vanguard was placed this turn, this unit gets +5000.\n[AUTO](back row RC): When your vanguard placed from your deck this turn attacks, [COST: CB1], [Stand] this unit, move it to an empty (RC), and retire it at the end of that turn.',
+      abilities: [{ kind: 'CONT', zones: ['RC'], power: selfPower(5000, (g, x) => { const v = g.P(x.p).vc; return !!v && g.def(v.c).grade >= 3 && v.rideTurn === g.turn; }) }] });
+    add['037'] = U('037', 'Platinamane Stallion', KS, 1, { race: 'High Beast', clan: 'Gold Paladin', verified: false, text: '[AUTO]: When this unit is placed on (RC), if you have a grade 3 or greater vanguard whose only clan is "Gold Paladin", [COST: EB3], look at the top three cards of your deck, call up to one grade 3 or less unit with a different card name to an empty (RC), and put the rest on the bottom of your deck. If you called, put this unit on the bottom of your deck at the end of that turn.' + NOT_AUTO });
+    add['074'] = U('074', 'Inflictor Dragon', KS, 3, { race: 'Abyss Dragon', text: '[AUTO](RC): When this unit attacks a vanguard, [COST: EB3 & retire a rear-guard in another column], draw 1, and this unit gets +10000 until end of turn.',
+      abilities: [{ kind: 'AUTO', on: 'attack', zones: ['RC'], label: 'Draw 1, +10000', cost: { eb: 3 }, cond: (g, x) => !!g.battle && g.battle.targetIsVC && g.rearguards(x.p).some(r => COL[r.circ] !== COL[x.circ]),
+        resolve: function* (g, x) { const c = yield* g.chooseUnit(x.p, { rearOnly: true, filter: r => COL[r.circ] !== COL[x.circ], title: 'Cost: retire a rear-guard in another column', purpose: 'costRetire' }); if (!c) return; g.retire(x.p, c, 'cost'); g.draw(x.p, 1); plusTurn(g, x.unit, x.p, 10000); } }] });
+    add['075'] = U('075', 'Knight of Judgment Sickle, Idwal', KS, 3, { race: 'Human', text: '[AUTO](front row RC)[1/turn]: When your vanguard is placed, your front row units get +5000 until end of turn.',
+      abilities: [{ kind: 'AUTO', on: 'vgPlaced', zones: ['RC'], oncePerTurn: true, label: 'Front row +5000', cond: (g, x) => FRONT_RC.includes(x.circ), resolve: function* (g, x) { for (const c of ['VC', 'FL', 'FR']) { const u = g.unitAt(x.p, c); if (u) g.addMod(u, { power: 5000, until: 'turn' }); } g.log('Front row +5000.', x.p); } }] });
+    add['076'] = U('076', 'Knight of Connecting Hope, Triffyhn', KS, 1, { race: 'Angel', text: '[AUTO](RC): At the end of the battle this unit boosted, if your opponent\'s vanguard is grade 3 or greater, [COST: retire this unit], choose one of your vanguards; it gets +10000 until end of turn.',
+      abilities: [{ kind: 'AUTO', on: 'boostEnd', zones: ['RC'], optional: true, label: 'Retire this: your vanguard +10000', cost: { retireSelf: true }, cond: oppVG3, resolve: function* (g, x) { const v = g.P(x.p).vc; if (v) plusTurn(g, v, x.p, 10000); } }] });
+    add['077'] = ORD('077', 'Endless Sorcery Exploration', KS, 3, 'normal', { cost: { sb: 2 },
+      text: 'Normal Order. Play only if your opponent\'s vanguard is grade 3 or greater. [COST: SB2] Look at the top card of your deck and put it on the top of your deck or into your soul. Choose one of your vanguards; it gets +5000 until end of turn.',
+      canPlay: oppVG3,
+      play: function* (g, x) {
+        const pl = g.P(x.p); const c = pl.deck[0];
+        if (c && (yield* g.yesno(x.p, 'Top card: ' + g.name(c) + '. Put it into your soul? (No keeps it on top)', 'ability', { id: c.id }))) { pl.deck.shift(); g.toZone(x.p, [c], 'soul'); }
+        plusTurn(g, pl.vc, x.p, 5000);
+      } });
+    add['111'] = U('111', 'Knight of Piercing Acuity Undercover, Zois', KS, 3, { race: 'Human', text: '[CONT](RC): If your order zone has two or more "Monitored Tryst", this unit gets +5000 and cannot be retired by your opponent\'s card effects.',
+      abilities: [{ kind: 'CONT', zones: ['RC'], power: selfPower(5000, (g, x) => trysts(g, x.p).length >= 2), noRetire: (g, x) => trysts(g, x.p).length >= 2 }] });
+    add['112'] = U('112', 'Monitoring Ravener Undercover, Awnfar', KS, 2, {
+      race: 'Elf', text: '[AUTO]: When this unit is placed on (VC) by riding from "Volley of Blades Undercover, Onux", [COST: reveal a grade 3 card with "Mordalion" in its card name from your ride deck], search your deck for up to one "Monitored Tryst", reveal it, put it into your hand, and shuffle your deck.\n[CONT](RC): During your turn, if your order zone has two or more "Monitored Tryst", this unit gets +5000.',
+      abilities: [
+        { kind: 'AUTO', on: 'placedVC', zones: ['VC'], label: 'Search a Monitored Tryst', cond: (g, x) => g.P(x.p).soul.some(c => g.name(c) === 'Volley of Blades Undercover, Onux') && g.P(x.p).rideDeck.some(c => g.def(c).grade === 3 && g.name(c).includes('Mordalion')),
+          resolve: function* (g, x) { yield* searchToHand(g, x.p, c => g.name(c) === TRYST, 'Put a Monitored Tryst into your hand'); } },
+        { kind: 'CONT', zones: ['RC'], power: selfPower(5000, (g, x) => myTurn(g, x) && trysts(g, x.p).length >= 2) }
+      ]
+    });
+    add['116'] = U('116', 'Volley of Blades Undercover, Onux', KS, 1, {
+      race: 'Human', text: '[AUTO]: When this unit is placed on (VC) by riding from "Hidden Flash Undercover, Serendis", [COST: reveal a grade 3 card with "Mordalion" in its card name from your ride deck], search your deck for up to one "Monitored Tryst", reveal it, put it into your hand, and shuffle your deck.\n[CONT](RC): During your turn, if your order zone has two or more "Monitored Tryst", this unit gets +2000.',
+      abilities: [
+        { kind: 'AUTO', on: 'placedVC', zones: ['VC'], label: 'Search a Monitored Tryst', cond: (g, x) => g.P(x.p).soul.some(c => g.name(c) === 'Hidden Flash Undercover, Serendis') && g.P(x.p).rideDeck.some(c => g.def(c).grade === 3 && g.name(c).includes('Mordalion')),
+          resolve: function* (g, x) { yield* searchToHand(g, x.p, c => g.name(c) === TRYST, 'Put a Monitored Tryst into your hand'); } },
+        { kind: 'CONT', zones: ['RC'], power: selfPower(2000, (g, x) => myTurn(g, x) && trysts(g, x.p).length >= 2) }
+      ]
+    });
+    add['113'] = U('113', 'Rhombic Ward Sorceress', KS, 2, { race: 'Human', text: '[AUTO]: When this unit is placed on (RC) or put on (GC), [COST: EB3], it gets +5000 power and shield +10000 until end of turn.',
+      abilities: [{ kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: '+5000', cost: { eb: 3 }, resolve: function* (g, x) { plusTurn(g, x.unit, x.p, 5000); } },
+        { kind: 'AUTO', on: 'putOnGC', zones: ['GC'], label: 'Shield +10000', cost: { eb: 3 }, resolve: function* (g, x) { x.unit.mods.push({ shield: 10000, until: 'battle' }); g.log(g.name(x.card) + ' shield +10000.', x.p); } }] });
+    add['114'] = U('114', 'Lifesaving Angel, Harshiel', KS, 2, { race: 'Angel', power: 8000, text: BEHIND_TEXT, abilities: behindAbs });
+    add['115'] = U('115', 'Claw of Secret Schemes Undercover, Tigris', KS, 1, { race: 'High Beast', text: '[AUTO](RC): At the end of the battle this unit boosted, [COST: EB2], return this unit to your hand.\n[AUTO]: When this unit is put on (GC), [COST: put a card with "Undercover" in its card name from your drop on the bottom of your deck], it gets shield +5000 until end of that battle.',
+      abilities: [{ kind: 'AUTO', on: 'boostEnd', zones: ['RC'], optional: true, label: 'Return this unit to hand', cost: { eb: 2 }, resolve: function* (g, x) { const c = g.circOf(x.p, x.unit); if (c) g.removeUnit(x.p, c, 'hand'); } },
+        { kind: 'AUTO', on: 'putOnGC', zones: ['GC'], label: 'Shield +5000', cost: { dropToBottom: { n: 1, label: 'an Undercover card from your drop to the bottom of your deck', filter: (g, c) => undercover(g.name(c)) } }, resolve: function* (g, x) { x.unit.mods.push({ shield: 5000, until: 'battle' }); } }] });
+    add['117'] = U('117', 'Divine Sister, S\'more', KS, 1, { race: 'Elf', text: '[AUTO](RC): When this unit boosts, if you placed two or more of your rear-guards this turn, it gets +2000 until end of that battle. At the end of that battle, you may put this unit into your soul.',
+      abilities: [{ kind: 'AUTO', on: 'boost', zones: ['RC'], label: '+2000', cond: (g, x) => tfN(g, 'placedCount', x.p) >= 2, resolve: function* (g, x) { plusBattle(g, x.unit, x.p, 2000); g.grant(x.unit, { kind: 'AUTO', on: 'boostEnd', zones: ['RC'], optional: true, label: 'Put this unit into the soul', cost: { selfToSoul: true }, resolve: function* () {} }, 'battle'); } }] });
+    add['118'] = U('118', 'Bringer of Turning Point, Aion', KS, 1, { race: 'Sylph', text: '[AUTO]: When this unit is placed on (RC), [COST: CB2], draw 1, and this unit gets +5000 until end of turn.',
+      abilities: [{ kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'Draw 1, +5000', cost: { cb: 2 }, resolve: function* (g, x) { g.draw(x.p, 1); plusTurn(g, x.unit, x.p, 5000); } }] });
+    add['119'] = U('119', 'Hidden Flash Undercover, Serendis', KS, 0, { race: 'Human', text: G0TEXT, abilities: [firstVanguardDraw] });
+
+    /* ======================= Stoicheia ======================= */
+    const stoe = vgHas('Stoeirhaja');
+    const codexN = (g, p) => tfN(g, 'codexCount', p);
+    const codexPlay = (g, x) => vgNamed(g, x.p, 'Stoeirhaja') && !(g.tf.orderNames && g.tf.orderNames[x.p] && g.tf.orderNames[x.p].includes(g.name(x.card)));
+    add['016'] = U('016', 'Venerable, Stoeirhaja', ST, 3, {
+      race: 'Insect',
+      text: '[CONT](VC): During your turn, if your opponent\'s vanguard is grade 3 or greater and you played a Codex order this turn, your front row units get +5000.\n[AUTO](VC)[1/turn]: When you play a normal order, if your opponent\'s vanguard is grade 3 or greater, until end of turn, you can play one more order this turn, and you cannot play orders other than Codex orders.\n[AUTO](VC): When this unit attacks, [COST: CB1], choose one of your rear-guards for each Codex order you played this turn, and [Stand] them.',
+      abilities: [
+        { kind: 'CONT', zones: ['VC'], power: (g, x) => myTurn(g, x) && oppVG3(g, x) && codexN(g, x.p) > 0 && ['VC', 'FL', 'FR'].includes(x.target) ? 5000 : 0 },
+        { kind: 'AUTO', on: 'orderPlayed', zones: ['VC'], oncePerTurn: true, label: 'One more order (Codex only)', cond: (g, x) => g.def(x.subject).order === 'normal' && oppVG3(g, x),
+          resolve: function* (g, x) { (g.tf.extraOrder || (g.tf.extraOrder = [0, 0]))[x.p]++; (g.tf.codexOnly || (g.tf.codexOnly = [false, false]))[x.p] = true; g.log('You can play one more order this turn (Codex orders only).', x.p); } },
+        { kind: 'AUTO', on: 'attack', zones: ['VC'], label: 'Stand a rear-guard per Codex order', cost: { cb: 1 }, cond: (g, x) => codexN(g, x.p) > 0 && g.rearguards(x.p).some(r => r.u.rested),
+          resolve: function* (g, x) {
+            for (let i = 0; i < codexN(g, x.p); i++) { const c = yield* g.chooseUnit(x.p, { rearOnly: true, optional: true, filter: r => r.u.rested, title: 'Stand which rear-guard?', purpose: 'stand' }); if (!c) break; g.stand(g.unitAt(x.p, c)); g.log(g.name(g.unitAt(x.p, c).c) + ' stands.', x.p); }
+            yield* g._flushStood();
+          } }
+      ]
+    });
+    add['127'] = ORD('127', 'The Principles of Unsatisfactoriness', ST, 3, 'normal', {
+      codex: true,
+      text: 'Normal Order (Codex). Play only if you have a grade 3 or greater vanguard with "Stoeirhaja" in its card name and you have not played an order with this card\'s name this turn. Until the end of your opponent\'s next turn, your opponent\'s vanguards get -3000. Then, if you played another Codex order this turn, you may [COST: SB2] to draw 1, and your opponent\'s vanguards also get drive -1 until the end of their next turn.',
+      canPlay: codexPlay,
+      play: function* (g, x) {
+        const o = g.P(opp(x)); const d = o.vgDebuff = o.vgDebuff && o.vgDebuff.until >= g.turn + 1 ? o.vgDebuff : { power: 0, drive: 0, until: g.turn + 1 };
+        d.power -= 3000; g.log('Your opponent\'s vanguards get -3000 until the end of their next turn.', x.p);
+        if (codexN(g, x.p) >= 2 && g.P(x.p).soul.length >= 2 && (yield* g.yesno(x.p, 'SB2: draw 1 and give your opponent\'s vanguards drive -1?', 'ability'))) { yield* g.soulBlast(x.p, 2); g.draw(x.p, 1); d.drive -= 1; g.log('Their vanguards also get drive -1.', x.p); }
+      }
+    });
+    add['128'] = ORD('128', 'The Principles of Nonself', ST, 3, 'normal', {
+      codex: true,
+      text: 'Normal Order (Codex). Play only if you have a grade 3 or greater vanguard with "Stoeirhaja" in its card name and you have not played an order with this card\'s name this turn. Call a grade 3 or less card from your drop to (RC); it gets +5000 until end of turn. If your opponent\'s vanguard is grade 3 or greater, it also gets "[AUTO](RC)[1/turn]: When this unit [Stand]s by your card\'s ability, it gets critical +1 until end of turn." until end of turn.',
+      canPlay: (g, x) => codexPlay(g, x) && g.P(x.p).drop.some(c => isUnit(g, c) && g.def(c).grade <= 3),
+      play: function* (g, x) {
+        const pl = g.P(x.p); const cs = yield* g.selectCards(x.p, pl.drop.filter(c => isUnit(g, c) && g.def(c).grade <= Math.min(3, g.vgGrade(x.p))), { title: 'Call a unit from your drop', min: 1, max: 1, purpose: 'callFromDrop' });
+        for (const c of cs) {
+          const u = yield* g.callFrom(x.p, c, 'drop', { from: 'drop' }); if (!u) continue; plusTurn(g, u, x.p, 5000);
+          if (oppVG3(g, x)) g.grant(u, { kind: 'AUTO', on: 'stoodBy', zones: ['RC'], oncePerTurn: true, label: 'Critical +1', cond: (gg, xx) => xx.trigUnit === xx.unit, resolve: function* (gg, xx) { gg.addMod(xx.unit, { crit: 1, until: 'turn' }); gg.log(gg.name(xx.unit.c) + ' critical +1.', xx.p); } }, 'turn');
+        }
+      }
+    });
+    add['017'] = U('017', 'Fly Over Vivartika', ST, 2, {
+      race: 'Insect', text: '[AUTO]: When this unit is placed on (RC), [COST: CB1], look at the top seven cards of your deck, choose up to one Codex card, reveal it, put it into your hand, and shuffle your deck. If you did not reveal, draw 1.\n[CONT](RC): This unit gets +5000 for each Codex order you played this turn.',
+      abilities: [
+        { kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'Look at the top seven for a Codex', cost: { cb: 1 }, resolve: function* (g, x) { const p = yield* lookTop(g, x.p, 7, { title: 'Put up to one Codex card into your hand', pick: c => !!g.def(c).codex, shuffle: true, purpose: 'search', take: function* (c) { yield* toHandFromTrig(g, x.p, c); } }); if (!p.length) g.draw(x.p, 1); } },
+        { kind: 'CONT', zones: ['RC'], power: (g, x) => x.targetUnit === x.unit ? 5000 * codexN(g, x.p) : 0 }
+      ]
+    });
+    add['018'] = U('018', 'Amicable Maiden, Alvina', ST, 1, {
+      race: 'Bioroid', text: '[AUTO]: When this unit is placed on (RC) from hand outside of the battle phase, [COST: EB3], choose one: put an order card other than a Regalis Piece from your drop into your hand; or call a grade 1 or less unit from your drop to (RC).\n[CONT](RC): During your turn, if you have four or more units, this unit gets +2000.',
+      abilities: [
+        { kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'An order to hand, or call a grade 1 from the drop', cost: { eb: 3 }, cond: (g, x) => x.from === 'hand' && g.phase !== 'battle' && g.P(x.p).drop.some(c => (g.def(c).type === 'order' && !g.def(c).regalis) || (isUnit(g, c) && g.def(c).grade <= 1)),
+          resolve: function* (g, x) {
+            const pl = g.P(x.p); const ords = pl.drop.filter(c => g.def(c).type === 'order' && !g.def(c).regalis), units = pl.drop.filter(c => isUnit(g, c) && g.def(c).grade <= 1);
+            const k = ords.length && units.length ? yield* pickOne(g, x.p, 'Alvina: choose one', [{ key: 'o', label: 'An order from your drop to hand' }, { key: 'u', label: 'Call a grade 1 or less unit from your drop' }]) : ords.length ? 'o' : 'u';
+            if (k === 'o') { const cs = yield* g.selectCards(x.p, ords, { title: 'Put an order into your hand', min: 1, max: 1, purpose: 'fromDrop' }); for (const c of cs) { g.take(pl.drop, c); pl.hand.push(c); } }
+            else { const cs = yield* g.selectCards(x.p, units, { title: 'Call a grade 1 or less unit', min: 1, max: 1, purpose: 'callFromDrop' }); for (const c of cs) yield* g.callFrom(x.p, c, 'drop', { from: 'drop' }); }
+          } },
+        { kind: 'CONT', zones: ['RC'], power: selfPower(2000, (g, x) => myTurn(g, x) && g.units(x.p).length >= 4) }
+      ]
+    });
+    add['038'] = U('038', 'Hurtful Pompilidio', ST, 3, {
+      race: 'Insect', text: '[CONT](RC): This unit gets +5000 for each Codex order you played this turn.\n[AUTO](front row RC): When your vanguard is attacked by your opponent\'s rear-guard, [COST: retire this unit], that attacking rear-guard gets minus its original power until end of turn.',
+      abilities: [
+        { kind: 'CONT', zones: ['RC'], power: (g, x) => x.targetUnit === x.unit ? 5000 * codexN(g, x.p) : 0 },
+        { kind: 'AUTO', on: 'vcAttacked', zones: ['RC'], label: 'Retire this: the attacker loses its original power', cost: { retireSelf: true }, cond: (g, x) => FRONT_RC.includes(x.circ) && !!g.battle && g.battle.tp === x.p && g.circOf(g.battle.ap, g.battle.aUnit) !== 'VC',
+          resolve: function* (g, x) { const u = g.battle.aUnit; const n = g.def(u.c).power || 0; g.addMod(u, { power: -n, until: 'turn' }); g.log(g.name(u.c) + ' -' + fmt(n) + '.', x.p); } }
+      ]
+    });
+    add['039'] = U('039', 'Flowerstorm Dragon', ST, 2, { race: 'Forest Dragon', text: DISCARD_TEXT + '\n[CONT](RC): If your order card was put into your drop this turn, this unit gets [Boost].', abilities: [discardCall(), { kind: 'CONT', zones: ['RC'], gainBoost: (g, x) => !!tfN(g, 'orderToDrop', x.p) }] });
+    add['040'] = U('040', 'Mare Clausum Dragon', ST, 2, { race: 'Tear Dragon', verified: false, text: '[AUTO]: When this card is discarded from your hand during your turn, if you have a grade 3 or greater vanguard with "Maelstrom" in its card name, [COST: EB2], call this card to (RC).\n[CONT](RC)/(GC): If your order zone has a "Blue Storm Armada", this unit can intercept from the back row and gets +5000 power / shield +5000.' + NOT_AUTO });
+    add['041'] = U('041', 'Mythiarq, Merrylish', ST, 2, { race: 'High Beast', verified: false, text: '[AUTO]: When this unit is placed on (RC) by the ability of your card with "Mythiarq" in its card name, if you have a vanguard with "Mythiarq" in its card name, [COST: CB1], draw 1; until end of turn, your opponent must call two or more cards at once to guard the battles this unit attacks.' + NOT_AUTO });
+    add['042'] = U('042', 'Mythiarq, Rissumy', ST, 1, { race: 'High Beast', verified: false, text: '[AUTO](Drop): When your grade 3 or greater vanguard with "Mythiarq" in its card name is placed during your ride phase, choose one: if you have no units with this card\'s name, you may call this card to the back row center (RC); or, if you do, [COST: SB1 & put this card on the bottom of your deck], draw 1.\n[CONT](back row center RC): During your turn, if your opponent\'s vanguard is grade 3 or greater, your front row units with "Mythiarq" in their card names get +5000.' + NOT_AUTO });
+    add['056'] = crit4('056', 'Aspiring Maiden, Alana', ST, 'Bioroid');
+    add['057'] = draw4('057', 'Serene Maiden, Lena', ST, 'Bioroid');
+    add['058'] = reissue('D-BT02/054', '058');
+    add['079'] = U('079', 'Marine General of Myriad Waves, Cypria', ST, 3, { race: 'Aquaroid', verified: false, text: '[AUTO](RC): When this unit attacks, Soul-Charge 1. If an order card was soul charged, put a normal or blitz order from your drop into your hand. If you did not, this unit gets +5000 until end of that battle.',
+      abilities: [{ kind: 'AUTO', on: 'attack', zones: ['RC'], label: 'Soul-Charge 1', resolve: function* (g, x) {
+        const pl = g.P(x.p); const top = pl.deck[0]; g.soulCharge(x.p, 1);
+        if (top && g.def(top).type === 'order') { const cs = yield* g.selectCards(x.p, pl.drop.filter(c => g.def(c).type === 'order' && ['normal', 'blitz'].includes(g.def(c).order)), { title: 'Put a normal or blitz order from your drop into your hand', min: 0, max: 1, purpose: 'fromDrop' }); if (cs.length) { g.take(pl.drop, cs[0]); pl.hand.push(cs[0]); return; } }
+        plusBattle(g, x.unit, x.p, 5000);
+      } }] });
+    add['080'] = U('080', 'Mythiarq, Porcurhyle', ST, 3, { race: 'High Beast', text: '[CONT]: When you count units for the ability of your unit with "Mythiarq" in its card name, this unit may count as two units.\n[AUTO]: When this unit attacks, if you have five or more units with "Mythiarq" in their card names, it gets +10000 until end of that battle.',
+      abilities: [{ kind: 'AUTO', on: 'attack', zones: ['VC', 'RC'], label: 'This unit +10000', cond: (g, x) => g.units(x.p).reduce((n, s) => n + (g.name(s.u.c).includes('Mythiarq') ? (g.name(s.u.c) === 'Mythiarq, Porcurhyle' ? 2 : 1) : 0), 0) >= 5, resolve: function* (g, x) { plusBattle(g, x.unit, x.p, 10000); } }] });
+    add['081'] = U('081', 'Persist Chlorophorus', ST, 1, { race: 'Insect', text: '[AUTO](RC): At the end of the battle this unit attacked or boosted, [COST: put this unit into your soul], look at the top seven cards of your deck, choose up to one Codex card, reveal it, put it into your hand, and shuffle your deck.',
+      abilities: ['battleEnd', 'boostEnd'].map(on => ({ kind: 'AUTO', on, zones: ['RC'], optional: true, label: 'Into the soul: look for a Codex', cost: { selfToSoul: true }, cond: (g, x) => g.P(x.p).deck.length > 0,
+        resolve: function* (g, x) { yield* lookTop(g, x.p, 7, { title: 'Put up to one Codex card into your hand', pick: c => !!g.def(c).codex, shuffle: true, purpose: 'search', take: function* (c) { yield* toHandFromTrig(g, x.p, c); } }); } })) });
+    add['082'] = U('082', 'Toasty Yuzuyu', ST, 1, { race: 'Dryad', text: '[AUTO]: When this unit is placed on (RC), [COST: CB1], call up to two Plant tokens (grade 0, 5000 power, Boost) to (RC).',
+      abilities: [{ kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'Call two Plant tokens', cost: { cb: 1 }, cond: (g, x) => g.emptyRC(x.p).length > 0 && !!CARDS['TOKEN/PLANT'],
+        resolve: function* (g, x) { for (let i = 0; i < 2; i++) { const e = g.emptyRC(x.p); if (!e.length) break; const c = e.length === 1 ? e[0] : yield* g.chooseCircle(x.p, { title: 'Call a Plant token to which circle?', circles: e }); yield* g.callTo(x.p, g.mkToken('TOKEN/PLANT'), c, 'token'); } } }] });
+    add['083'] = ORD('083', 'Beginning of a Journey', ST, 2, 'blitz', { text: 'Blitz Order. Choose one of your opponent\'s attacking units; it gets -10000 until end of that battle. If your drop has three or more cards with this card\'s name, it gets -10000 until end of turn instead.',
+      canPlay: (g, x) => !!g.battle && g.battle.tp === x.p,
+      play: function* (g, x) { const u = g.battle.aUnit; const n = g.P(x.p).drop.filter(c => g.name(c) === 'Beginning of a Journey').length; g.addMod(u, { power: -10000, until: n >= 3 ? 'turn' : 'battle' }); g.log(g.name(u.c) + ' -10,000.', x.p); } });
+    add['120'] = U('120', 'Luminary, Gamga', ST, 2, { race: 'Insect', text: '[AUTO]: When this unit is rode upon by a grade 3 card with "Stoeirhaja" in its card name, [COST: SB1], search your deck for up to one Codex card, reveal it, put it into your hand, and shuffle your deck.\n[AUTO]: When this unit is placed on (RC), if you played a Codex order this turn, Soul-Charge 1, and this unit gets +5000 until end of turn.',
+      abilities: [
+        { kind: 'AUTO', on: 'rodeUpon', label: 'Search a Codex', cost: { sb: 1 }, cond: (g, x) => g.def(x.newCard).grade === 3 && g.name(x.newCard).includes('Stoeirhaja'), resolve: function* (g, x) { yield* searchToHand(g, x.p, c => !!g.def(c).codex, 'Put a Codex card into your hand'); } },
+        { kind: 'AUTO', on: 'placedRC', zones: ['RC'], label: 'Soul-Charge 1, +5000', cond: (g, x) => codexN(g, x.p) > 0, resolve: function* (g, x) { g.soulCharge(x.p, 1); plusTurn(g, x.unit, x.p, 5000); } }
+      ] });
+    add['121'] = U('121', 'Verdure Protector, Stigald', ST, 2, { race: 'Warbeast', power: 8000, text: BEHIND_TEXT, abilities: behindAbs });
+    add['122'] = U('122', 'Kusumamala, Lamp', ST, 1, { race: 'Insect', text: '[AUTO]: When this unit is rode upon by "Luminary, Gamga", look at the top seven cards of your deck, choose up to one grade 3 or greater card with "Stoeirhaja" in its card name or up to one Codex card, reveal it, put it into your hand, and shuffle your deck.\n[AUTO](RC): At the end of your turn, if you played a Codex order this turn, [COST: retire this unit], put a grade 3 or greater card with "Stoeirhaja" in its card name from your drop into your hand.',
+      abilities: [
+        { kind: 'AUTO', on: 'rodeUpon', label: 'Look at the top seven', cond: (g, x) => g.name(x.newCard) === 'Luminary, Gamga',
+          resolve: function* (g, x) { yield* lookTop(g, x.p, 7, { title: 'Put a Stoeirhaja or a Codex card into your hand', pick: c => !!g.def(c).codex || (g.def(c).grade >= 3 && g.name(c).includes('Stoeirhaja')), shuffle: true, purpose: 'search', take: function* (c) { yield* toHandFromTrig(g, x.p, c); } }); } },
+        { kind: 'AUTO', on: 'endOfTurn', zones: ['RC'], label: 'Retire this: a Stoeirhaja from the drop to hand', cost: { retireSelf: true }, cond: (g, x) => codexN(g, x.p) > 0 && g.P(x.p).drop.some(c => g.def(c).grade >= 3 && g.name(c).includes('Stoeirhaja')),
+          resolve: function* (g, x) { const pl = g.P(x.p); const c = pl.drop.find(cc => g.def(cc).grade >= 3 && g.name(cc).includes('Stoeirhaja')); if (c) { g.take(pl.drop, c); pl.hand.push(c); } } }
+      ] });
+    add['123'] = U('123', 'Shaky Peanut', ST, 1, { race: 'Dryad', text: '[AUTO]: When this card is discarded from your deck during your turn, you may put it into your soul.' + NOT_AUTO });
+    add['124'] = U('124', 'Knight of Quietude, Clive', ST, 1, { race: 'Bioroid', text: '[AUTO](Drop): At the beginning of your battle phase, if you played two or more orders this turn, [COST: CB1], call this card to (RC).',
+      abilities: [{ kind: 'AUTO', on: 'battleStart', zones: ['drop'], optional: true, label: 'Call this card from the drop', cost: { cb: 1 }, cond: (g, x) => tfN(g, 'orderCount', x.p) >= 2 && g.P(x.p).drop.includes(x.card) && g.emptyRC(x.p).length > 0,
+        resolve: function* (g, x) { if (g.P(x.p).drop.includes(x.card)) yield* g.callFrom(x.p, x.card, 'drop', { from: 'drop', circles: g.emptyRC(x.p) }); } }] });
+    add['125'] = U('125', 'Rafting Fairy', ST, 1, { race: 'Sylph', text: '[CONT](RC): If three or more of your rear-guards were placed by your card abilities this turn, this unit gets +10000.', abilities: [{ kind: 'CONT', zones: ['RC'], power: selfPower(10000, (g, x) => tfN(g, 'placedByAb', x.p) >= 3) }] });
+    add['126'] = U('126', 'Udumbara Flower, Banana', ST, 0, { race: 'Insect', text: G0TEXT, abilities: [firstVanguardDraw] });
+    add['019'] = ORD('019', 'Bracing Angel Ladder', null, 3, 'normal', { regalis: true, verified: false,
+      text: 'Regalis Piece (one per deck, used once per fight). Normal Order. Draw 1 and put this card into your soul. Until the end of your opponent\'s next turn: during your turn, your vanguards get +5000; your rear-guards cannot be chosen by your opponent\'s card effects.',
+      canPlay: (g, x) => !g.P(x.p).perm.regalisUsed,
+      play: function* (g, x) {
+        const pl = g.P(x.p); pl.perm.regalisUsed = true; g.draw(x.p, 1); if (pl.drop.includes(x.card)) { g.take(pl.drop, x.card); g.toZone(x.p, [x.card], 'soul'); }
+        pl.ladderUntil = g.turn + 1; plusTurn(g, pl.vc, x.p, 5000);
+        for (const r of g.rearguards(x.p)) r.u.protectUntil = g.turn + 1;
+        g.log('Your rear-guards cannot be chosen by your opponent\'s effects until the end of their next turn.', x.p);
+      } });
+
+    for (const no in add) if (add[no]) CARDS[S + '/' + no] = add[no];
+
+    const deck = (name, ride, counts) => {
+      const c = {}; for (const id in counts) c[id.includes('/') ? id : S + '/' + id] = counts[id];
+      return { name, ride: ride.map(id => id.includes('/') ? id : S + '/' + id), counts: c };
+    };
+    DECKS.kotihblaze = deck('Kotihblaze (Dragon Empire)', ['092', '089', '085', '002'],
+      { '002': 3, '020': 3, '059': 4, '004': 4, '085': 3, '060': 2, '087': 4, '062': 2, '088': 3, '091': 2,
+        'D-SD01/008': 4, '044': 4, '045': 4, '046': 3, 'D-SD01/014': 4, 'DZ-BT01/019': 1 });
+    DECKS.sacrificeglass = deck('Sacrifice Glass / Grandogma (Dark States)', ['101', '099', '097', '005'],
+      { '005': 3, '006': 3, '026': 4, '097': 3, '096': 2, '098': 2, '027': 4, '100': 3, '028': 2, '067': 3, '068': 1,
+        'D-BT01/036': 4, '047': 4, '048': 4, '049': 3, 'D-BT01/080': 4, 'DZ-BT01/020': 1 });
+    DECKS.daiyusha = deck('Daiyusha (Brandt Gate)', ['110', '108', '069', '011'],
+      { '011': 3, '012': 4, '069': 3, '073': 4, '031': 4, '107': 4, '108': 3, '103': 2, '105': 2, '106': 1,
+        'D-BT01/042': 4, '050': 4, '051': 4, '052': 3, 'D-BT01/091': 4, 'DZ-BT01/021': 1 });
+    DECKS.mordalion = deck('Mordalion Undercover (Keter Sanctuary)', ['119', '116', '112', '013'],
+      { '013': 3, '078': 4, '014': 4, '033': 3, '111': 3, '112': 3, '116': 3, '113': 2, '115': 3, '118': 2,
+        'D-BT01/049': 4, '053': 4, '054': 4, '055': 3, 'D-BT01/105': 4, 'DZ-BT01/022': 1 });
+    DECKS.stoeirhaja = deck('Stoeirhaja Codex (Stoicheia)', ['126', '122', '120', '016'],
+      { '016': 3, '127': 4, '128': 4, '017': 4, '120': 3, '122': 3, '081': 3, '018': 2, '124': 2, '083': 2,
+        'D-BT01/052': 4, '056': 4, '057': 4, '058': 3, 'D-BT01/117': 4, 'DZ-BT01/023': 1 });
+  }
+  if (typeof module !== 'undefined' && module.exports) module.exports = install; else root.VGCardsDZBT03 = install;
+})(this);
 
 ;
 /* Card database. Stats and abilities follow the printed English cards; rules text below is a short summary written for the simulator.
@@ -5696,6 +6574,8 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
   if (dbt02) dbt02(CARDS, helpers, DECKS);
   const dzss0910 = root.VGCardsDZSS0910 || (typeof require !== 'undefined' ? require('./cards_dzss0910.js') : null);
   if (dzss0910) dzss0910(CARDS, helpers, DECKS);
+  const dzbt03 = root.VGCardsDZBT03 || (typeof require !== 'undefined' ? require('./cards_dzbt03.js') : null);
+  if (dzbt03) dzbt03(CARDS, helpers, DECKS);
   for (const id in CARDS) { CARDS[id].id = id; if (!CARDS[id].abilities) CARDS[id].abilities = []; }
 
   function expandDeck(d) { const main = []; for (const id in d.counts) for (let i = 0; i < d.counts[id]; i++) main.push(id); return { ride: d.ride.slice(), main, crest: [].concat(d.crest || 'DZ-SS13/005') }; } // current rules: every deck has an Energy Generator
@@ -5789,6 +6669,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
     /* move cards to a zone; tokens cease to exist when they leave the field */
     toZone(p, cards, zone) {
       const pl = this.P(p);
+      if (zone === 'soul') { const n = cards.filter(c => c && !c.token).length; if (n) { const t = this.tf.toSoulByAb || (this.tf.toSoulByAb = [0, 0]); t[p] += n; const b = this.tf.toSoulBatch || (this.tf.toSoulBatch = [0, 0]); b[p] = Math.max(b[p], n); } }
       for (const c of cards) {
         if (!c || c.token) continue;
         if (zone === 'bottom') pl.deck.push(c); else if (zone === 'top') pl.deck.unshift(c); else pl[zone].push(c);
@@ -5810,6 +6691,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
     rideDeckHas(p, f) { return this.P(p).rideDeck.some(c => f(this.def(c), c)); }
     abilitiesOf(card, unit) {
       if (this.nullUntil && card && card.owner != null && this.nullUntil[card.owner] >= this.turn) return [];
+      if (this.nullRGUntil && card && card.owner != null && this.nullRGUntil[card.owner] >= this.turn && !(unit && this.P(card.owner).vc === unit) && !this.P(card.owner).hand.includes(card)) return (this.def(card).abilities || []).filter(ab => ab.kind === 'ACT');
       const base = this.def(card).abilities || [];
       return unit && unit.granted && unit.granted.length ? base.concat(unit.granted.map(g => g.ab)) : base;
     }
@@ -5825,6 +6707,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
     }
     hasPrison(p) { return this.P(p).orderZone.some(c => this.def(c).prison); }
     contFlag(p, circ, u, key) { return this.abilitiesOf(u.c, u).some(ab => ab.kind === 'CONT' && ab[key] && this.zoneOk(ab, circ) && (typeof ab[key] !== 'function' || ab[key](this, { p, unit: u, circ }))); }
+    orderSlot(p, d) { if (this.tf.codexOnly && this.tf.codexOnly[p] && !d.codex) return false; return !this.tf.orderPlayed[p] || (!!d.codex && this.tf.extraOrder && this.tf.extraOrder[p] > 0); }
     mateOk(p, d) { if (!d.mate) return true; const vc = this.P(p).vc; return !!vc && this.name(vc.c).includes(d.mate); }
     canIntercept(p, circ, u) {
       if (u.noInterceptUntil >= this.turn) return false;
@@ -5847,7 +6730,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
       return this.abilitiesOf(u.c, u).some(ab => ab.kind === 'CONT' && ab.noBoost && this.zoneOk(ab, circ) && ab.noBoost(this, { p, unit: u, circ }));
     }
     driveMod(p, circ, u) {
-      let n = 0; for (const ab of this.abilitiesOf(u.c, u)) if (ab.kind === 'CONT' && ab.drive && this.zoneOk(ab, circ)) n += ab.drive(this, { p, unit: u, circ }) || 0;
+      let n = 0; const db = this.P(p).vgDebuff; if (circ === 'VC' && db && db.until >= this.turn) n += db.drive || 0; for (const ab of this.abilitiesOf(u.c, u)) if (ab.kind === 'CONT' && ab.drive && this.zoneOk(ab, circ)) n += ab.drive(this, { p, unit: u, circ }) || 0;
       return n;
     }
     emptyRC(p) { return RCS.filter(c => !this.unitAt(p, c)); }
@@ -5877,6 +6760,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
       }
       if (this.tf.persona[p] && FRONT.includes(circ)) v += 10000;
       if (circ === 'VC' && this.active === p && this.P(p).perm.vgBuff) v += 10000 * this.P(p).perm.vgBuff;
+      const db = this.P(p).vgDebuff; if (circ === 'VC' && db && db.until >= this.turn) v += db.power || 0;
       return v;
     }
     crit(p, circ) {
@@ -5936,7 +6820,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
     }
     soulCharge(p, n) {
       const pl = this.P(p); for (let i = 0; i < n; i++) { if (!pl.deck.length) break; pl.soul.push(pl.deck.shift()); }
-      if (n > 0) { this.tf.soulCharged[p] = true; (this.tf.scCount || (this.tf.scCount = [0, 0]))[p] += n; }
+      if (n > 0) { this.tf.soulCharged[p] = true; (this.tf.scCount || (this.tf.scCount = [0, 0]))[p] += n; const t = this.tf.toSoulByAb || (this.tf.toSoulByAb = [0, 0]); t[p] += n; const b = this.tf.toSoulBatch || (this.tf.toSoulBatch = [0, 0]); b[p] = Math.max(b[p], n); }
       this.log(this.names[p] + ': Soul-Charge ' + n + '.', p); this.checkRules();
     }
     counterBlast(p, n) {
@@ -5981,6 +6865,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
       if (cost.handToSoul && handN < cost.handToSoul) return false;
       if (cost.handToSoulPick && pl.hand.filter(c => (!exclude || !exclude.includes(c)) && cost.handToSoulPick.filter(this, c)).length < cost.handToSoulPick.n) return false;
       if (cost.bindSelfRC && !onField) return false;
+      if (cost.restOZ && !(ctx && ctx.card && pl.orderZone.includes(ctx.card) && !ctx.card.rested)) return false;
       if (cost.bindOrderDrop && pl.drop.filter(c => this.def(c).type === 'order' && c !== (ctx && ctx.card)).length < cost.bindOrderDrop) return false;
       if (cost.bindSelfFD && !onField) return false;
       if (cost.selfToBottom && !onField) return false;
@@ -6014,6 +6899,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
       if (cost.otherFrontToSoul) t.push('another front row rear-guard into soul');
       if (cost.sc) t.push('Soul-Charge ' + cost.sc);
       if (cost.bindSelfRC) t.push('bind this unit');
+      if (cost.restOZ) t.push('[Rest] this card');
       if (cost.bindOrderDrop) t.push('bind an order from your drop');
       if (cost.bindSelfFD) t.push('bind this unit face down');
       if (cost.selfToBottom) t.push('put this unit on the bottom of your deck');
@@ -6042,6 +6928,8 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
         if (pick) yield* this.pay(p, pick.c, exclude, ctx);
         return;
       }
+      if (cost.restOZ && ctx && ctx.card) ctx.card.rested = true;
+      if (cost.eb >= 3) { const t = this.tf.bigEB || (this.tf.bigEB = [0, 0]); t[p] = Math.max(t[p], cost.eb); }
       if (cost.eb) { pl0.energy -= cost.eb; this.log(this.names[p] + ': Energy-Blast ' + cost.eb + ' (' + pl0.energy + ' left).', p); }
       if (cost.sbPick) {
         const pool = pl0.soul.filter(c => cost.sbPick.filter(this, c));
@@ -6200,11 +7088,13 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
       if (circ !== 'VC' && this.active !== p && !['attack', 'cost', 'replaced', 'rule'].includes(why)) (this.tf.lostRG || (this.tf.lostRG = [false, false]))[p] = true;
       this.removeUnit(p, circ, toHand ? 'hand' : 'drop');
       this.log(this.name(u.c) + ' is retired' + (why ? ' (' + why + ')' : '') + (toHand ? ' and returns to hand' : '') + '.', p);
+      if (circ !== 'VC' && this.tf.ecOnOppRetire && this.tf.ecOnOppRetire[1 - p]) this.energyCharge(1 - p, 1);
       if (circ !== 'VC') { this.tf.retired[p]++; (this.pendingRetired || (this.pendingRetired = [])).push(p); }
       return u;
     }
     *callTo(p, card, circ, from) {
       if (from !== 'hand') (this.tf.calledNonHand || (this.tf.calledNonHand = [false, false]))[p] = true;
+      { const t = this.tf.placedCount || (this.tf.placedCount = [0, 0]); t[p]++; if (from !== 'hand') { const q = this.tf.placedByAb || (this.tf.placedByAb = [0, 0]); q[p]++; } }
       if (this.unitAt(p, circ)) this.retire(p, circ, 'replaced');
       const u = this.mkUnit(card); this.setUnit(p, circ, u);
       const byVG = this.srcIsVC(p); if (byVG) { u.placedByVG = this.turn; (this.tf.vgPlacedRC || (this.tf.vgPlacedRC = [false, false]))[p] = true; }
@@ -6315,7 +7205,8 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
           for (const x of this.units(ctx.p)) add(ctx.p, x.u.c, x.u, x.circ); break;
         case 'discarded': add(ctx.p, ctx.card, null, null); break;
         case 'retiredBy': case 'toSoulFromRC': case 'boundFromRC': case 'toSoulByAbility': case 'retiredAsCost': case 'driveChecked': case 'gaugeDiscarded': add(ctx.p, ctx.card, null, null); break;
-        case 'allyPlaced': case 'gaugePut': for (const c of this.P(ctx.p).drop.slice()) add(ctx.p, c, null, null); break;
+        case 'allyPlaced': case 'gaugePut': for (const c of this.P(ctx.p).drop.slice()) add(ctx.p, c, null, null); if (ev === 'allyPlaced') for (const x of this.rearguards(ctx.p)) add(ctx.p, x.u.c, x.u, x.circ); break;
+        case 'rideStart': { const vc = this.P(ctx.p).vc; if (vc) add(ctx.p, vc.c, vc, 'VC'); break; }
         case 'guardStepDef': { const b = this.battle; for (const x of this.units(b.tp)) add(b.tp, x.u.c, x.u, x.circ); for (const c of this.P(b.tp).hand.slice()) add(b.tp, c, null, null); break; }
         case 'vgPlaced': for (const x of this.rearguards(ctx.p)) add(ctx.p, x.u.c, x.u, x.circ); break;
         case 'battleEndHand': { const b = this.battle; for (const c of this.P(b.ap).hand.slice()) add(b.ap, c, null, null); break; }
@@ -6441,7 +7332,8 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
           this.phase = 'draw'; this.draw(p, 1);
           this.phase = 'ride';
           if (this.P(p).crest.length) this.energyCharge(p, 3);
-          yield* this._ridePhase(p);
+          yield* this.fire('rideStart', { p });
+          if (!(this.tf.noRide && this.tf.noRide[p])) yield* this._ridePhase(p);
           this.pendingRetired = [];
           this.phase = 'main'; yield* this._mainPhase(p); this.pendingRetired = [];
           if (this.turn > 1) { this.phase = 'battle'; yield* this._battlePhase(p); }
@@ -6520,8 +7412,8 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
       const pl = this.P(p); const old = pl.vc;
       const persona = this.isPersonaRide(p, card, fromRideDeck);
       const firstRide = pl.crestDeck.length > 0;
-      this.toZone(p, [old.c, ...old.under], 'soul');
-      const u = this.mkUnit(card); u.rested = old.rested; pl.vc = u; u.rodeFrom = fromRideDeck ? 'rideDeck' : 'hand';
+      for (const c of [old.c, ...old.under]) if (c && !c.token) pl.soul.push(c);
+      const u = this.mkUnit(card); u.rested = old.rested; pl.vc = u; u.rideTurn = this.turn; u.rodeFrom = fromRideDeck ? 'rideDeck' : 'hand';
       this.log(this.names[p] + ' rides ' + this.name(card) + (fromRideDeck ? ' (Ride Deck)' : '') + '.', p);
       if (firstRide) {
         pl.crest.push(...pl.crestDeck); const names = pl.crestDeck.map(c => this.name(c)).join(', '); pl.crestDeck = [];
@@ -6544,12 +7436,12 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
             if (u && (typeof d.overDress === 'function' ? d.overDress(this, u) : this.name(u.c) === d.overDress)) acts.push({ key: 'od:' + c.iid + ':' + circ, kind: 'od', iid: c.iid, id: c.id, circ, label: 'overDress ' + d.name + ' → ' + CIRC_PT[circ] });
           }
         }
-        if (d.type === 'order' && d.order !== 'blitz' && d.grade <= g && !this.tf.orderPlayed[p] && this.canPay(p, d.cost, [c]) && (!d.canPlay || d.canPlay(this, { p, card: c })))
+        if (d.type === 'order' && d.order !== 'blitz' && d.grade <= g && this.orderSlot(p, d) && this.canPay(p, d.cost, [c]) && (!d.canPlay || d.canPlay(this, { p, card: c })))
           acts.push({ key: 'order:' + c.iid, kind: 'order', iid: c.iid, id: c.id, label: 'Play ' + (d.order === 'set' ? 'set order ' : 'order ') + d.name });
       }
       for (const c of pl.drop) {
         const d = this.def(c);
-        if (c.playFromDrop === this.turn && d.type === 'order' && d.order !== 'blitz' && d.grade <= g && !this.tf.orderPlayed[p] && this.canPay(p, d.cost, [c]) && (!d.canPlay || d.canPlay(this, { p, card: c })))
+        if ((c.playFromDrop === this.turn || d.dropPlayable) && d.type === 'order' && d.order !== 'blitz' && d.grade <= g && this.orderSlot(p, d) && this.canPay(p, d.cost, [c]) && (!d.canPlay || d.canPlay(this, { p, card: c })))
           acts.push({ key: 'order:' + c.iid, kind: 'order', iid: c.iid, id: c.id, label: 'Play ' + (d.order === 'set' ? 'set order ' : 'order ') + d.name + ' from the drop' });
       }
       for (const col of ['L', 'R']) {
@@ -6566,6 +7458,13 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
           acts.push({ key: 'act:' + x.circ + ':' + i, kind: 'act', circ: x.circ, i, id: x.u.c.id, label: this.name(x.u.c) + ': ' + (ab.divine ? '[Divine Skill] ' : '') + ab.label + ' [' + this.costText(ab.cost) + ']' });
         });
       }
+      for (const oc of pl.orderZone) for (const [c, zone] of [[oc, 'order'], [oc.gauge, 'gauge']]) if (c) (this.def(c).abilities || []).forEach((ab, i) => {
+        if (ab.kind !== 'ACT' || !(ab.zones || []).includes(zone)) return;
+        if (ab.oncePerTurn && this.tf.used.has(c.iid + ':' + i)) return;
+        if (ab.cond && !ab.cond(this, { p, card: c })) return;
+        if (!this.canPay(p, ab.cost, null, { card: c })) return;
+        acts.push({ key: 'oact:' + c.iid + ':' + i, kind: 'dropAct', iid: c.iid, i, id: c.id, label: this.name(c) + ' (' + (zone === 'order' ? 'order zone' : 'undercover gauge') + '): ' + ab.label + ' [' + this.costText(ab.cost) + ']' });
+      });
       for (const c of pl.drop) (this.def(c).abilities || []).forEach((ab, i) => {
         if (ab.kind !== 'ACT' || !(ab.zones || []).includes('drop')) return;
         if (ab.oncePerTurn && this.tf.used.has(c.iid + ':' + i)) return;
@@ -6612,7 +7511,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
           const c = pl.hand.find(x => x.iid === a.iid) || pl.drop.find(x => x.iid === a.iid);
           yield* this.playOrder(p, c);
         } else if (a.kind === 'dropAct') {
-          const c = pl.drop.find(x => x.iid === a.iid); const ab = this.def(c).abilities[a.i];
+          const c = pl.drop.find(x => x.iid === a.iid) || pl.orderZone.find(x => x.iid === a.iid) || pl.orderZone.map(x => x.gauge).find(x => x && x.iid === a.iid); const ab = this.def(c).abilities[a.i];
           if (ab.oncePerTurn) this.tf.used.add(c.iid + ':' + a.i);
           yield* this.pay(p, ab.cost, null, { card: c });
           this.log('⚡ ' + this.name(c) + ': ' + ab.label, p);
@@ -6634,8 +7533,13 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
       const pl = this.P(p); const d = this.def(c);
       if (this.tf.orderPlayed[p] && d.order === 'blitz' && this.tf.extraBlitz && this.tf.extraBlitz[p] > 0) this.tf.extraBlitz[p]--;
       if (d.order === 'blitz' && this.battle) this.battle.blitzPlayed = true;
-      const fromDrop = !pl.hand.includes(c) && pl.drop.includes(c) && c.playFromDrop === this.turn;
-      this.take(fromDrop ? pl.drop : pl.hand, c); this.tf.orderPlayed[p] = true; this.tf.orderThisTurn[p] = true; pl.trig.push(c);
+      const fromDrop = !pl.hand.includes(c) && pl.drop.includes(c) && (c.playFromDrop === this.turn || !!d.dropPlayable);
+      const fromSoul = !pl.hand.includes(c) && !fromDrop && pl.soul.includes(c) && !!d.playFromSoul;
+      if (this.tf.orderPlayed[p] && d.order !== 'blitz' && this.tf.extraOrder && this.tf.extraOrder[p] > 0) this.tf.extraOrder[p]--;
+      const inc = k => { const t = this.tf[k] || (this.tf[k] = [0, 0]); t[p]++; };
+      inc('orderCount'); if (d.codex) inc('codexCount'); ((this.tf.orderNames || (this.tf.orderNames = [[], []]))[p]).push(d.name);
+      if (d.order === 'set') inc('ozPut'); else inc('orderToDrop');
+      this.take(fromDrop ? pl.drop : fromSoul ? pl.soul : pl.hand, c); this.tf.orderPlayed[p] = true; this.tf.orderThisTurn[p] = true; pl.trig.push(c);
       if (d.ultimate) (this.tf.ultimatePlayed || (this.tf.ultimatePlayed = [false, false]))[p] = true;
       if (d.order === 'normal') (this.tf.normalOrderPlayed || (this.tf.normalOrderPlayed = [false, false]))[p] = true;
       if (d.magazine) (this.tf.magazinePlayed || (this.tf.magazinePlayed = [false, false]))[p] = true;
@@ -6675,7 +7579,8 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
           if (pl.drop.includes(partner)) { this.take(pl.drop, partner); if (this.def(partner).toSoul) pl.soul.push(partner); else pl.bind.push(partner); this.log(this.name(partner) + (this.def(partner).toSoul ? ' goes into the soul.' : ' is bound (bind zone).'), p); }
         }
       }
-      if (fromDrop) { c.playFromDrop = null; if (pl.drop.includes(c)) { this.take(pl.drop, c); pl.deck.push(c); this.log(this.name(c) + ' goes to the bottom of the deck.', p); } }
+      if (fromSoul && pl.drop.includes(c)) { this.take(pl.drop, c); pl.deck.push(c); this.log(this.name(c) + ' goes to the bottom of the deck.', p); }
+      if (fromDrop && !d.dropPlayable) { c.playFromDrop = null; if (pl.drop.includes(c)) { this.take(pl.drop, c); pl.deck.push(c); this.log(this.name(c) + ' goes to the bottom of the deck.', p); } }
       yield* this.fire('orderPlayed', { p, card: c });
       this.checkRules();
     }
@@ -6695,10 +7600,10 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
     attackActions(p) {
       const o = 1 - p; const acts = [];
       const COLN = { L: 'left', C: 'center', R: 'right' };
-      const backAtk = ['BL', 'BC', 'BR'].filter(c => { const u = this.unitAt(p, c); return u && u.mods.some(m => m.backAttack); });
+      const backAtk = ['BL', 'BC', 'BR'].filter(c => { const u = this.unitAt(p, c); return u && (u.mods.some(m => m.backAttack) || this.contFlag(p, c, u, 'backAttack')); });
       for (const a of FRONT.concat(backAtk)) {
         const u = this.unitAt(p, a); if (!u || u.rested) continue;
-        if (this.contFlag(p, a, u, 'noAttack')) continue;
+        if (this.contFlag(p, a, u, 'noAttack') || u.noAttackTurn === this.turn) continue;
         const bu = BEHIND[a] ? this.unitAt(p, BEHIND[a]) : null;
         const canB = !!(bu && !bu.rested && this.canBoost(bu) && !this.cannotBeBoosted(p, a, u));
         const rgCol = this.abilitiesOf(u.c, u).some(ab => ab.kind === 'CONT' && ab.rgColumnAttack && this.zoneOk(ab, a) && ab.rgColumnAttack(this, { p, unit: u, circ: a }));
@@ -6757,6 +7662,11 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
         const od = this.def(c);
         if (od.type === 'order' && od.order === 'blitz' && od.grade <= this.vgGrade(d) && (!this.tf.orderPlayed[d] || (this.tf.extraBlitz && this.tf.extraBlitz[d] > 0)) && this.canPay(d, od.cost, [c]) && (!od.canPlay || od.canPlay(this, { p: d, card: c })))
           acts.push({ key: 'bz' + c.iid, kind: 'blitz', iid: c.iid, id: c.id, label: 'Play blitz order ' + od.name });
+      }
+      for (const c of pl.soul) {
+        const od = this.def(c); if (!od.playFromSoul || od.order !== 'blitz') continue;
+        if (od.grade <= this.vgGrade(d) && (!this.tf.orderPlayed[d] || (this.tf.extraBlitz && this.tf.extraBlitz[d] > 0)) && this.canPay(d, od.cost, [c]) && (!od.canPlay || od.canPlay(this, { p: d, card: c })))
+          acts.push({ key: 'bz' + c.iid, kind: 'blitz', iid: c.iid, id: c.id, label: 'Play blitz order ' + od.name + ' from the soul' });
       }
       for (const c of ['FL', 'FR', 'BL', 'BC', 'BR']) {
         const u = pl.rc[c];
@@ -6824,7 +7734,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
             this.log(this.names[o] + ' guards with ' + cs.map(c => this.name(c)).join(', ') + (live.length > 1 ? ' (protecting ' + this.name(forU.c) + ')' : '') + '.', o);
             for (const gu of placed) yield* this.fire('putOnGC', { p: o, g: gu });
           } else if (g.kind === 'blitz') {
-            const c = pl.hand.find(x => x.iid === g.iid);
+            const c = pl.hand.find(x => x.iid === g.iid) || pl.soul.find(x => x.iid === g.iid);
             yield* this.playOrder(o, c);
           } else {
             const forU = yield* this._guardFor(o);
@@ -6897,7 +7807,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
       }
       // close step
       yield* this.fireAll((this.battle.bUnit ? [['battleEnd', {}], ['boostEnd', {}], ['battleEndVC', {}]] : [['battleEnd', {}], ['battleEndVC', {}]]).concat([['vgBattleEnd', {}], ['rgBattleEnd', {}], ['battleEndDef', {}], ['battleEndHand', {}]]));
-      for (const pl of this.players) { for (const g of pl.gc) this.toZone(pl.idx, [g.c], 'drop'); pl.gc = []; }
+      for (const pl of this.players) { if (pl.gc.length && this.tf.ecOnOppRetire && this.tf.ecOnOppRetire[1 - pl.idx]) this.energyCharge(1 - pl.idx, pl.gc.length); for (const g of pl.gc) this.toZone(pl.idx, [g.c], 'drop'); pl.gc = []; }
       for (const u of targets) u.noHit = false;
       this.expire('battle');
       this.battle = null;
@@ -6972,6 +7882,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
       const pl = this.P(p);
       let n = pl.deck.length + pl.rideDeck.length + pl.hand.length + pl.drop.length + pl.damage.length + pl.soul.length + pl.removed.length + pl.gc.length + pl.trig.length + pl.orderZone.length + pl.bind.length + pl.crest.length + pl.crestDeck.length;
       n += this.P(1 - p).prison.length; // own cards imprisoned by the opponent
+      n += pl.orderZone.filter(c => c.gauge).length; // undercover gauges
       for (const c of CIRCS) { const u = this.unitAt(p, c); if (u) n += (u.c.token ? 0 : 1) + u.under.length; }
       return n;
     }
@@ -7116,6 +8027,15 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
       if (n === 'Dragon Knight, Nehalem' && g.turn > 2) return a.key;
       if ((n === 'Stealth Dragon, Kizanreiji' || n === 'Strong Fortress Dragon, Gibrabrachio') && g.rearguards(o).length >= 1) return a.key;
       if (n === 'Bizarre Beast, Bagumotor') return a.key;
+      if (n === 'Fiery Immolation Dragon, Kotihblaze' && g.emptyRC(p).length >= 1) return a.key;
+      if (n === 'Emberbreath Dragon' && fu >= 2) return a.key;
+      if (n === 'Fire Pole Emperor, Dajaru' && g.phase === 'main' && pl.drop.some(c => g.def(c).type === 'unit' && !g.def(c).trigger && g.units(p).some(s => g.name(s.u.c) === g.name(c)))) return a.key;
+      if (n === 'Poison Knight of Silence Undercover, Mordalion') return a.key;
+      if (n === 'Knight of Blackness of Yore Undercover, Obscudeid' && !g.unitAt(p, 'BC')) return a.key;
+      if (n === 'Melody of Fiendish Flower, Takka' && pl.damage.length >= 1) return a.key;
+      if (n === 'Causal Flare Dragon' && g.rearguards(o).length >= 1 && g.rearguards(p).some(r => r.u.c.token || g.def(r.u.c).grade === 0)) return a.key;
+      if (n === 'Enliven Magician' || n === 'Silver Thorn Dragon Empress, Venus Luquier') return a.key;
+      if (n === 'Miasmic Beast, Madulla' && pl.hand.length >= 3) return a.key;
       if (n === 'Blast' && g.rearguards(p).filter(r => r.u.c.token && r.u.c.id !== 'TOKEN/BLAST').length + (g.emptyRC(p).length <= 1 ? 1 : 0) >= 2) return a.key;
       if (n === 'Legend of the Celestial Fury, Estacion') return a.key;
       if (n === 'Lusdiana of Sunny Spring' && pl.energy >= 6) return a.key;
@@ -7129,7 +8049,11 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
       if (n === 'Sylvan Horned Beast, Bilber' && g.emptyRC(p).some(c => ['BL', 'BC', 'BR'].includes(c)) && pl.soul.length >= 1) return a.key;
       if (n === 'Sylvan Horned Beast, Bojalcorn' && fu >= 2 && ['BL', 'BC', 'BR'].includes(g.circOf(p, g.unitAt(p, a.circ))) && ['FL', 'VC', 'FR'].filter(c => g.unitAt(o, c)).length >= 2) return a.key;
     }
-    for (const a of by('dropAct')) if (g.emptyRC(p).length >= 1 && g.faceUpDamage(p) >= 0 && pl.soul.length >= 2) return a.key;
+    for (const a of by('dropAct')) {
+      const d = g.db[a.id];
+      if (d.name === 'Super Dimensional Fortress, Daibase') { if (/soul/.test(a.label) && !/Call/.test(a.label)) return a.key; if (/Call/.test(a.label) && g.emptyRC(p).length >= 1 && pl.energy >= 4) return a.key; continue; }
+      if (g.emptyRC(p).length >= 1 && pl.soul.length >= 2) return a.key;
+    }
     for (const a of by('crest')) if (pl.hand.length <= 6) return a.key;
     // orders (World set orders first, then normal orders that have a target)
     for (const a of by('order')) {
@@ -7160,6 +8084,12 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
         case 'Moment of Capture! Aurora Battle Princess 24-hr Coverage!': return a.key;
         case 'Horns of Blessing': return a.key;
         case 'Harmonious Off-Shot': if (new Set(g.rearguards(p).map(r => g.name(r.u.c))).size >= 3) return a.key; break;
+        case 'The Principles of Unsatisfactoriness': if (g.vgGrade(o) >= 3) return a.key; break;
+        case 'The Principles of Nonself': if (g.emptyRC(p).length >= 1 || g.rearguards(p).some(r => r.u.c.token)) return a.key; break;
+        case 'Saccharine Bait': if (/Grandogma/.test(g.name(pl.vc.c)) || g.rearguards(o).length + g.rearguards(p).length >= 5) return a.key; break;
+        case 'Endless Sorcery Exploration': if (pl.soul.length >= 4) return a.key; break;
+        case 'Polar Quake Sword, Ligetung': if (fu >= 1 && g.rearguards(o).length >= 1) return a.key; break;
+        case 'Bracing Angel Ladder': if (g.turn >= 5) return a.key; break;
         case 'Blazing Star Cross': if (g.units(p).some(s => /Ezerwur/.test(g.name(s.u.c)))) return a.key; break;
         case 'Vital Blaze Blast': if (g.emptyRC(p).length >= 1) return a.key; break;
         case 'Wild Intelligence': if (fu >= 1 && g.emptyRC(p).length >= 1) return a.key; break;
