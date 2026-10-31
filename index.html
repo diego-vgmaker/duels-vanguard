@@ -376,6 +376,65 @@ details summary { cursor: pointer; color: var(--ink); font-weight: 600; }
 #rank-hist table.rank { background: rgba(20, 26, 60, .55); border-radius: 18px; overflow: hidden; }
 table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
 @media (max-width: 760px) { .rslot { width: 54px; } #b-ride { gap: 6px; flex-wrap: nowrap; } }
+
+/* accounts */
+.acct { display: flex; align-items: center; }
+.who-btn { display: inline-flex; align-items: center; gap: 8px; max-width: 200px; }
+.who-btn .acct-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.avatar { width: 24px; height: 24px; flex: 0 0 auto; border-radius: 50%; display: grid; place-items: center; background: var(--gold); color: var(--gold-ink); font-family: var(--f-display); font-weight: 800; font-size: 12px; }
+@media (max-width: 520px) { .who-btn .acct-name { display: none; } .who-btn { padding: 4px; } }
+.auth-tabs { display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--abyss); border: 1px solid var(--line); }
+.auth-tabs button { flex: 1; background: none; border: 0; border-radius: 999px; padding: 8px 12px; color: var(--ink-dim); font-weight: 600; }
+.auth-tabs button[aria-selected="true"] { background: var(--mat-2); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line-2); }
+.btn.google { background: #fff; color: #1f1f1f; border-color: #fff; }
+.btn.google:hover { background: #eef0ff; }
+.or { display: flex; align-items: center; gap: 10px; color: var(--ink-dim); font-size: 12px; }
+.or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.form-msg { font-size: 13px; margin: 0; }
+.form-msg:empty { display: none; }
+.form-msg.err { color: #ffb3bd; }
+.form-msg.good { color: var(--leaf); }
+.linkbtn { background: none; border: 0; padding: 0; color: var(--gold); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; justify-self: start; }
+.field-row .hint { font-size: 12px; color: var(--ink-dim); }
+
+/* meta */
+.meta-filters { display: flex; gap: 10px 14px; flex-wrap: wrap; align-items: end; margin-top: 10px; }
+.meta-filters .field-row { min-width: 150px; }
+.meta-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); margin-top: 14px; }
+.meta-grid > .panel, .meta-wide { min-width: 0; }
+.meta-wide { margin-top: 14px; }
+.small { font-size: 13px; }
+.bars { display: grid; gap: 4px; }
+.bar { display: grid; grid-template-columns: minmax(0, 9.5em) minmax(0, 1fr) 3.6em; grid-template-areas: "bl track v" ". sub sub"; align-items: center; gap: 4px 10px; width: 100%; text-align: left; background: none; border: 0; border-radius: 12px; padding: 6px 8px; }
+.bar .bl { grid-area: bl; } .bar .track { grid-area: track; } .bar .v { grid-area: v; } .bar .sub { grid-area: sub; }
+.bar:hover { background: rgba(150, 165, 255, .06); }
+.bar[aria-pressed="true"] { background: rgba(240, 195, 90, .08); box-shadow: inset 0 0 0 1px rgba(240, 195, 90, .3); }
+.bar .bl { display: flex; align-items: center; gap: 8px; min-width: 0; font-weight: 600; }
+.bar .bl span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar .track { height: 12px; border-radius: 4px; background: rgba(150, 165, 255, .08); overflow: hidden; }
+.bar .fill { height: 100%; border-radius: 0 4px 4px 0; background: var(--gold); min-width: 2px; }
+.bar .v { text-align: right; font-family: var(--f-display); font-weight: 700; font-variant-numeric: tabular-nums; }
+.bar .sub { font-size: 12px; color: var(--ink-dim); }
+.dot { width: 10px; height: 10px; flex: 0 0 auto; border-radius: 50%; background: var(--b, var(--nn-b)); }
+.dot.n-DE { --b: var(--de-b); } .dot.n-DS { --b: var(--ds-b); } .dot.n-BG { --b: var(--bg-b); } .dot.n-KS { --b: var(--ks-b); } .dot.n-ST { --b: var(--st-b); }
+.vlist { display: grid; gap: 10px; }
+.vrow { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+.vrow .card { font-size: 6px; }
+.vrow h4 { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.vrow .track { height: 6px; border-radius: 4px; background: rgba(150, 165, 255, .08); overflow: hidden; margin-top: 6px; }
+.vrow .fill { height: 100%; border-radius: 0 4px 4px 0; background: var(--gold); min-width: 2px; }
+.vrow .v { text-align: right; font-size: 12px; color: var(--ink-dim); }
+.vrow .v b { display: block; font-family: var(--f-display); font-size: 16px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.ctiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 14px 12px; }
+.ctile { display: grid; gap: 5px; align-content: start; font-size: 12px; color: var(--ink-dim); text-align: center; line-height: 1.3; }
+.ctile .card { font-size: 7px; }
+.ctile b { color: var(--ink); font-family: var(--f-display); font-size: 14px; font-variant-numeric: tabular-nums; }
+@media (max-width: 520px) { .bar { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "bl v" "track track" "sub sub"; } .ctiles { grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); } }
+@media (max-width: 640px) {
+  .top .acct { order: 2; margin-left: auto; }
+  .top .nav { order: 3; width: 100%; margin-left: 0; justify-content: space-between; flex-wrap: nowrap; }
+  .top .nav button { padding: 6px 10px; font-size: 14px; }
+}
 </style>
 </head>
 <body>
@@ -388,8 +447,10 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
       <button data-v="play">Play</button>
       <button data-v="decks">Decks</button>
       <button data-v="cards">Cards</button>
+      <button data-v="meta">Meta</button>
       <button data-v="ranking">Ranking</button>
     </nav>
+    <div class="acct" id="acct" hidden></div>
   </div>
 </header>
 
@@ -417,7 +478,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
       <h2>Online and global ranking</h2>
       <p class="muted" style="margin:0">Quick queue, player-vs-player matches and a shared ranking come next, with a match server. The engine is ready for it: every decision is a small message, so the same code runs on the server.</p>
       <button class="btn" disabled>Find a match (coming soon)</button>
-      <div class="note">For now the ranking is local to this browser.</div>
+      <div class="note" id="online-note">For now the ranking is local to this browser.</div>
     </section>
 
     <section class="panel stack">
@@ -484,6 +545,21 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
   <div class="cgrid" id="cards-grid"></div>
 </main>
 
+<main id="view-meta" class="wrap" hidden>
+  <h2 style="margin-top:8px">Meta</h2>
+  <p class="muted" style="margin:6px 0 0">What players are fighting with: nations, vanguards and cards from finished matches of signed-in players. Decks stay in each player's browser; only the list used in a match is counted, without names.</p>
+  <div class="meta-filters">
+    <div class="field-row"><label class="label" for="meta-days">Period</label>
+      <select id="meta-days"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option><option value="90">Last 90 days</option><option value="365">Last year</option></select></div>
+    <div class="field-row"><label class="label" for="meta-mode">Matches</label>
+      <select id="meta-mode"><option value="all">All</option><option value="bot">Against the bot</option><option value="online">Online</option></select></div>
+    <div class="row" id="meta-nation" role="group" aria-label="Filter vanguards and cards by nation">
+      <button class="btn small" data-f="all">All nations</button><button class="btn small" data-f="DE">Dragon Empire</button><button class="btn small" data-f="DS">Dark States</button><button class="btn small" data-f="BG">Brandt Gate</button><button class="btn small" data-f="KS">Keter Sanctuary</button><button class="btn small" data-f="ST">Stoicheia</button><button class="btn small" data-f="NN">Nationless</button>
+    </div>
+  </div>
+  <div id="meta-body" aria-live="polite"></div>
+</main>
+
 <main id="view-rank" class="wrap" hidden>
   <h2 style="margin-top:8px">Ranking</h2>
   <p class="muted">Local Elo rating against the bot (base 1000, K=32). The global player ranking arrives with online play.</p>
@@ -494,7 +570,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
 
 <footer class="wrap legal" id="legal">
   <p>duels.vanguard is a free, unofficial fan-made simulator. It is not affiliated with, endorsed, sponsored or approved by Bushiroad. Cardfight!! Vanguard, card names, card text and card images are © Bushiroad. All rights reserved.</p>
-  <p>Card images are used following the guidelines published on the <a href="https://en.cf-vanguard.com/vg_guideline/" target="_blank" rel="noopener">Cardfight!! Vanguard official website</a>. Reuse of the images (reproduction, distribution, etc.) is prohibited. No fees, ads or paid features.</p>
+  <p>Card images are used following the guidelines published on the <a href="https://en.cf-vanguard.com/vg_guideline/" target="_blank" rel="noopener">Cardfight!! Vanguard official website</a>. Reuse of the images (reproduction, distribution, etc.) is prohibited. No fees, ads or paid features. <a href="privacy.html">Privacy policy</a>.</p>
 </footer>
 
 <section class="game" id="game" hidden aria-label="Game table">
@@ -8534,12 +8610,12 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
     else img.remove();
   };
   /* ---------------- views / nav ---------------- */
-  const views = { play: 'view-home', decks: 'view-decks', cards: 'view-cards', ranking: 'view-rank' };
+  const views = { play: 'view-home', decks: 'view-decks', cards: 'view-cards', meta: 'view-meta', ranking: 'view-rank' };
   function route() {
     let v = (location.hash || '#play').slice(1); if (!views[v]) v = 'play';
     for (const k in views) $('#' + views[k]).hidden = k !== v;
     document.querySelectorAll('.nav button').forEach(b => b.setAttribute('aria-current', b.dataset.v === v ? 'page' : 'false'));
-    if (v === 'play') renderHome(); if (v === 'decks') renderBuilder(); if (v === 'cards') renderCards(); if (v === 'ranking') renderRank();
+    if (v === 'play') renderHome(); if (v === 'decks') renderBuilder(); if (v === 'cards') renderCards(); if (v === 'meta') renderMeta(); if (v === 'ranking') renderRank();
   }
   window.addEventListener('hashchange', route);
   document.querySelectorAll('.nav button').forEach(b => b.addEventListener('click', () => { location.hash = b.dataset.v; }));
@@ -8572,7 +8648,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
   let G = null, botTimer = null, ui = { sel: null }, meta = null;
   function startGame(mine, bot) {
     G = new Game(CARDS, [toPlayable(mine), toPlayable(bot)], { names: ['You', 'Bot'] });
-    meta = { mine: mine.name, bot: bot.name, done: false };
+    meta = { mine: mine.name, bot: bot.name, deck: mine, done: false };
     ui = { sel: null };
     $('#game').hidden = false; document.body.style.overflow = 'hidden';
     G.start(); pump();
@@ -8930,6 +9006,7 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
     store.set('rating', r);
     hist.unshift({ t: Date.now(), mine: meta.mine, bot: meta.bot, res: win ? 'V' : draw ? 'E' : 'D', turns: G.turn, delta, reason: resigned ? 'conceded' : G.reason });
     store.set('history', hist.slice(0, 50));
+    recordMatch(meta.deck, win ? 'win' : draw ? 'draw' : 'loss', G.turn);
     render();
     $('#result').innerHTML = '<div class="box"><h2 class="' + (win ? 'win' : 'lose') + '">' + (win ? 'Victory!' : draw ? 'Draw' : 'Defeat') + '</h2><p class="muted">' + esc(resigned ? 'You conceded.' : (G.reason || '')) + ' · ' + G.turn + ' turns</p>' +
       '<p><b>' + (delta >= 0 ? '+' : '') + delta + '</b> pts · rating ' + Math.round(r.r) + '</p><div class="row" style="justify-content:center"><button class="btn primary" id="r-again">Play again</button><button class="btn" id="r-menu">Menu</button></div></div>';
@@ -9059,6 +9136,290 @@ table.rank th { font-size: 12px; color: var(--ink-dim); font-weight: 600; }
   dz.addEventListener('dragleave', () => dz.classList.remove('over'));
   dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('over'); importFiles(e.dataTransfer.files); });
   refreshPack();
+
+  /* ---------------- online: player accounts + Meta (Supabase) ---------------- */
+  // Fill in from Supabase → Project Settings → API ("Project URL" and the "anon public" key).
+  // The anon key is public by design: what it may read or write is decided by supabase/schema.sql.
+  // While these are empty the site runs exactly as before, fully offline.
+  const ONLINE = { url: '', anonKey: '' };
+  const SB_SRC = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js';
+  const NAT_NAME = { DE: 'Dragon Empire', DS: 'Dark States', BG: 'Brandt Gate', KS: 'Keter Sanctuary', ST: 'Stoicheia', LM: 'Lyrical Monasterio', NN: 'Nationless' };
+  const NAME_RE = /^[A-Za-z0-9_]{3,20}$/;
+  const acct = { on: !!(ONLINE.url && ONLINE.anonKey), sb: null, user: null, name: '', failed: false, ready: null };
+  const baseUrl = () => location.origin + location.pathname;
+
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script'); s.src = src; s.async = true;
+      s.onload = resolve; s.onerror = () => reject(new Error('Could not load ' + src));
+      document.head.appendChild(s);
+    });
+  }
+  function authErr(e) {
+    const m = String((e && e.message) || e || '');
+    if (/invalid login credentials/i.test(m)) return 'Wrong email or password.';
+    if (/email not confirmed/i.test(m)) return 'Confirm your email first: open the link we sent you.';
+    if (/already registered|already been registered/i.test(m)) return 'An account with this email already exists. Sign in instead.';
+    if (/rate limit|too many/i.test(m)) return 'Too many attempts. Wait a few minutes and try again.';
+    if (/password should be|weak password/i.test(m)) return 'Choose a longer password (at least 8 characters).';
+    if (/provider is not enabled/i.test(m)) return 'Google sign-in is not switched on yet.';
+    if (/failed to fetch|network/i.test(m)) return 'Could not reach the server. Check your connection.';
+    return m || 'Something went wrong. Try again.';
+  }
+  function urlAuthError() {
+    const p = new URLSearchParams(location.search + '&' + location.hash.replace(/^#/, ''));
+    return p.get('error_description');
+  }
+  function cleanUrl() {
+    if (/access_token|refresh_token|error_description|type=recovery/.test(location.hash) || /[?&](code|error)=/.test(location.search))
+      history.replaceState(null, '', baseUrl() + '#play');
+  }
+
+  async function initOnline() {
+    renderAcct();
+    if (!acct.on) return;
+    try { await loadScript(SB_SRC); }
+    catch (e) { acct.failed = true; renderAcct(); return; }
+    acct.sb = window.supabase.createClient(ONLINE.url, ONLINE.anonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+    // supabase-js must not be awaited inside this callback, so the work runs on the next tick
+    acct.sb.auth.onAuthStateChange((ev, session) => setTimeout(() => onAuth(ev, session), 0));
+    const err = urlAuthError();
+    if (err) { cleanUrl(); toast(/expired|invalid/i.test(err) ? 'That link has expired. Ask for a new one.' : err); }
+    renderAcct();
+  }
+  async function onAuth(ev, session) {
+    const user = (session && session.user) || null;
+    const changed = (user && user.id) !== (acct.user && acct.user.id);
+    acct.user = user;
+    const recovery = ev === 'PASSWORD_RECOVERY';
+    cleanUrl();
+    if (!user) acct.name = '';
+    else if (changed || !acct.name) {
+      acct.name = '';
+      renderAcct();
+      const { data } = await acct.sb.from('profiles').select('username').eq('id', user.id).maybeSingle();
+      acct.name = (data && data.username) || (user.email || 'player').split('@')[0];
+      if (ev === 'SIGNED_IN' && changed && !recovery) toast('Signed in as ' + acct.name + '.');
+    }
+    renderAcct();
+    if (recovery) openRecovery();
+  }
+
+  function renderAcct() {
+    const el = $('#acct');
+    el.hidden = !acct.on;
+    if (acct.on) {
+      el.innerHTML = acct.user
+        ? '<button class="btn small ghost who-btn" id="acct-btn" aria-label="Your account"><span class="avatar" aria-hidden="true">' + esc((acct.name || '?').charAt(0).toUpperCase()) + '</span><span class="acct-name">' + esc(acct.name || 'Account') + '</span></button>'
+        : '<button class="btn small" id="acct-btn"' + (acct.sb ? '' : ' disabled') + '>' + (acct.failed ? 'Offline' : 'Sign in') + '</button>';
+      $('#acct-btn').onclick = () => (acct.user ? openAccount() : openAuth('in'));
+    }
+    const note = $('#online-note');
+    if (!acct.on) note.textContent = 'For now the ranking is local to this browser.';
+    else if (acct.user) note.innerHTML = 'Signed in as <b>' + esc(acct.name || '…') + '</b>. Your finished matches count on the <a href="#meta" style="color:var(--gold)">Meta</a> page; your decks stay in this browser.';
+    else note.innerHTML = 'Create a free account to have your matches count on the <a href="#meta" style="color:var(--gold)">Meta</a> page. The ranking is still local to this browser.';
+  }
+
+  function setMsg(text, good) { const m = $('#au-msg'); if (!m) return; m.textContent = text || ''; m.className = 'form-msg' + (text ? (good ? ' good' : ' err') : ''); }
+  function busy(btn, on, label) { btn.disabled = on; if (label) btn.textContent = label; }
+
+  function openAuth(mode, email) {
+    if (!acct.sb) return;
+    const up = mode === 'up', fg = mode === 'forgot';
+    openSheet(
+      (fg ? '<h3>Reset your password</h3><p class="muted" style="margin:0">We will email you a link to choose a new password.</p>'
+        : '<div class="auth-tabs" role="tablist"><button role="tab" type="button" aria-selected="' + !up + '" data-tab="in">Sign in</button><button role="tab" type="button" aria-selected="' + up + '" data-tab="up">Create account</button></div>' +
+          '<button class="btn google" id="au-google" type="button">Continue with Google</button><div class="or">or with email</div>') +
+      '<form id="au-form" class="stack" novalidate>' +
+      (up ? '<div class="field-row"><label class="label" for="au-user">Player name</label><input id="au-user" autocomplete="nickname" maxlength="20" spellcheck="false" autocapitalize="off"><span class="hint">3–20 letters, numbers or _ · shown to other players</span></div>' : '') +
+      '<div class="field-row"><label class="label" for="au-email">Email</label><input id="au-email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false"></div>' +
+      (fg ? '' : '<div class="field-row"><label class="label" for="au-pass">Password</label><input id="au-pass" type="password" autocomplete="' + (up ? 'new-password' : 'current-password') + '">' + (up ? '<span class="hint">At least 8 characters</span>' : '') + '</div>') +
+      '<p class="form-msg" id="au-msg" role="status"></p>' +
+      '<button class="btn primary" type="submit" id="au-go">' + (fg ? 'Send reset link' : up ? 'Create account' : 'Sign in') + '</button></form>' +
+      (fg ? '<button class="linkbtn" type="button" data-tab="in">Back to sign in</button>'
+        : up ? '<p class="muted" style="margin:0;font-size:12px">By creating an account you agree to the <a href="privacy.html" target="_blank" rel="noopener" style="color:var(--gold)">privacy policy</a>. Your email is never shown to other players.</p>'
+        : '<button class="linkbtn" type="button" data-tab="forgot">Forgot your password?</button>') +
+      '<button class="btn ghost" id="au-x" type="button">Close</button>');
+    if (email) $('#au-email').value = email;
+    $('#au-x').onclick = closeSheet;
+    document.querySelectorAll('#sheet [data-tab]').forEach(b => { b.onclick = () => openAuth(b.dataset.tab, $('#au-email').value.trim()); });
+    const g = $('#au-google');
+    if (g) g.onclick = async () => {
+      busy(g, true, 'Opening Google…');
+      const { error } = await acct.sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: baseUrl() } });
+      if (error) { busy(g, false, 'Continue with Google'); setMsg(authErr(error)); }
+    };
+    setTimeout(() => { const f = $(up ? '#au-user' : '#au-email'); if (f && !f.value) f.focus(); }, 50);
+    $('#au-form').onsubmit = async e => {
+      e.preventDefault();
+      const go = $('#au-go'); const label = go.textContent;
+      const mail = $('#au-email').value.trim();
+      const pass = fg ? '' : $('#au-pass').value;
+      const user = up ? $('#au-user').value.trim() : '';
+      if (up && !NAME_RE.test(user)) return setMsg('Player name: 3–20 letters, numbers or _ (no spaces).');
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) return setMsg('Enter a valid email.');
+      if (!fg && pass.length < (up ? 8 : 1)) return setMsg(up ? 'Password: at least 8 characters.' : 'Enter your password.');
+      setMsg(''); busy(go, true, 'Please wait…');
+      try {
+        if (fg) {
+          const { error } = await acct.sb.auth.resetPasswordForEmail(mail, { redirectTo: baseUrl() });
+          if (error) throw error;
+          setMsg('If an account exists for ' + mail + ', a reset link is on its way. Check your inbox and spam folder.', true);
+        } else if (up) {
+          const av = await acct.sb.rpc('username_available', { p_username: user });
+          if (av.error) throw av.error;
+          if (!av.data) { busy(go, false, label); return setMsg('That player name is taken. Try another one.'); }
+          const { data, error } = await acct.sb.auth.signUp({ email: mail, password: pass, options: { data: { username: user }, emailRedirectTo: baseUrl() } });
+          if (error) throw error;
+          if (data.user && Array.isArray(data.user.identities) && !data.user.identities.length) throw new Error('already registered');
+          if (data.session) { closeSheet(); toast('Welcome, ' + user + '!'); return; }
+          setMsg('Almost there: we sent a confirmation link to ' + mail + '. Open it to finish creating your account.', true);
+          go.hidden = true; return;
+        } else {
+          const { error } = await acct.sb.auth.signInWithPassword({ email: mail, password: pass });
+          if (error) throw error;
+          closeSheet(); return;
+        }
+      } catch (err) { setMsg(authErr(err)); }
+      busy(go, false, label);
+    };
+  }
+
+  function openRecovery() {
+    openSheet('<h3>Choose a new password</h3><form id="rc-form" class="stack" novalidate>' +
+      '<div class="field-row"><label class="label" for="rc-pass">New password</label><input id="rc-pass" type="password" autocomplete="new-password"><span class="hint">At least 8 characters</span></div>' +
+      '<div class="field-row"><label class="label" for="rc-pass2">Repeat it</label><input id="rc-pass2" type="password" autocomplete="new-password"></div>' +
+      '<p class="form-msg" id="au-msg" role="status"></p><button class="btn primary" type="submit" id="rc-go">Save password</button></form>');
+    $('#rc-form').onsubmit = async e => {
+      e.preventDefault();
+      const a = $('#rc-pass').value, b = $('#rc-pass2').value;
+      if (a.length < 8) return setMsg('Password: at least 8 characters.');
+      if (a !== b) return setMsg('The two passwords are different.');
+      const go = $('#rc-go'); busy(go, true, 'Saving…');
+      const { error } = await acct.sb.auth.updateUser({ password: a });
+      if (error) { busy(go, false, 'Save password'); return setMsg(authErr(error)); }
+      closeSheet(); toast('Password changed. You are signed in.');
+    };
+  }
+
+  function openAccount() {
+    const u = acct.user; if (!u) return;
+    const via = (u.app_metadata && u.app_metadata.provider) === 'google' ? 'Google' : 'email';
+    openSheet('<h3>Your account</h3><p class="muted" style="margin:0">Signed in with ' + via + ' · ' + esc(u.email || '') + '</p>' +
+      '<form id="ac-form" class="stack" novalidate><div class="field-row"><label class="label" for="ac-name">Player name</label><input id="ac-name" maxlength="20" spellcheck="false" autocapitalize="off" value="' + esc(acct.name) + '"><span class="hint">3–20 letters, numbers or _ · shown to other players</span></div>' +
+      '<p class="form-msg" id="au-msg" role="status"></p><div class="row"><button class="btn primary small" type="submit" id="ac-save">Save name</button></div></form>' +
+      '<div class="note">Your decks stay in this browser. Finished matches (the deck list, its nation and the result) are counted on the Meta page without your name.</div>' +
+      '<div class="row"><button class="btn" id="ac-out" type="button">Sign out</button><button class="btn danger small" id="ac-del" type="button">Delete account</button><span class="spacer" style="flex:1"></span><button class="btn ghost" id="ac-x" type="button">Close</button></div>');
+    $('#ac-x').onclick = closeSheet;
+    $('#ac-form').onsubmit = async e => {
+      e.preventDefault();
+      const v = $('#ac-name').value.trim();
+      if (v === acct.name) return setMsg('');
+      if (!NAME_RE.test(v)) return setMsg('Player name: 3–20 letters, numbers or _ (no spaces).');
+      const go = $('#ac-save'); busy(go, true, 'Saving…');
+      const { error } = await acct.sb.from('profiles').update({ username: v }).eq('id', u.id);
+      busy(go, false, 'Save name');
+      if (error) return setMsg(error.code === '23505' ? 'That player name is taken. Try another one.' : authErr(error));
+      acct.name = v; renderAcct(); setMsg('Saved.', true);
+    };
+    $('#ac-out').onclick = async () => { await acct.sb.auth.signOut(); closeSheet(); toast('Signed out.'); };
+    $('#ac-del').onclick = () => {
+      openSheet('<h3>Delete your account?</h3><p class="muted" style="margin:0">This removes your account, player name and recorded matches for good. Decks saved in this browser are not touched.</p><p class="form-msg" id="au-msg" role="status"></p>' +
+        '<div class="row"><button class="btn danger" id="dl-yes" type="button">Delete for good</button><button class="btn" id="dl-no" type="button">Keep my account</button></div>');
+      $('#dl-no').onclick = openAccount;
+      $('#dl-yes').onclick = async () => {
+        const b = $('#dl-yes'); busy(b, true, 'Deleting…');
+        const { error } = await acct.sb.rpc('delete_my_account');
+        if (error) { busy(b, false, 'Delete for good'); return setMsg(authErr(error)); }
+        await acct.sb.auth.signOut({ scope: 'local' });
+        closeSheet(); toast('Your account was deleted.');
+      };
+    };
+  }
+
+  /* deck stats: only the list used in a finished match is sent, never the saved decks */
+  function deckNation(d) {
+    const cnt = {};
+    for (const id in d.total) { const c = CARDS[id]; const n = c && c.type === 'unit' && NAT[c.nation]; if (n) cnt[n] = (cnt[n] || 0) + d.total[id]; }
+    return Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0] || 'NN';
+  }
+  const deckVanguard = d => d.ride.filter(id => CARDS[id]).sort((a, b) => CARDS[b].grade - CARDS[a].grade)[0];
+  async function recordMatch(d, result, turns) {
+    if (!acct.sb || !acct.user || !d || turns < 3) return; // instant concessions are not real use
+    const cards = {};
+    for (const id in d.total) if (d.total[id] > 0 && CARDS[id] && !CARDS[id].token) cards[id] = Math.min(4, d.total[id]);
+    const vanguard = deckVanguard(d);
+    if (!vanguard || !cards[vanguard]) return;
+    try {
+      const { error } = await acct.sb.from('matches_played').insert({ mode: 'bot', nation: deckNation(d), vanguard, cards, result, turns });
+      if (error) console.warn('duels.vanguard: match not recorded:', error.message);
+    } catch (e) { console.warn('duels.vanguard: match not recorded:', e); }
+  }
+
+  /* ---------------- meta page ---------------- */
+  const metaState = { days: 30, mode: 'all', nation: 'all', seq: 0 };
+  const pct = n => Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 1 }) + '%';
+  const num = n => Number(n || 0).toLocaleString('en-US');
+  function metaEmpty(html) { $('#meta-body').innerHTML = '<div class="panel" style="margin-top:14px"><p class="muted" style="margin:0">' + html + '</p></div>'; }
+  async function renderMeta() {
+    $('#meta-days').value = String(metaState.days); $('#meta-mode').value = metaState.mode;
+    document.querySelectorAll('#meta-nation button').forEach(b => b.setAttribute('aria-pressed', b.dataset.f === metaState.nation ? 'true' : 'false'));
+    if (!acct.on) return metaEmpty('The Meta page switches on together with player accounts. Until then everything runs offline in your browser.');
+    if (!acct.sb) {
+      if (acct.failed) return metaEmpty('Could not reach the stats server. Check your connection and reload the page.');
+      metaEmpty('Loading…');
+      if (acct.ready) acct.ready.then(() => { if (!$('#view-meta').hidden) renderMeta(); });
+      return;
+    }
+    const seq = ++metaState.seq;
+    const box = $('#meta-body'); box.setAttribute('aria-busy', 'true');
+    if (!box.innerHTML) metaEmpty('Loading…');
+    const args = { p_days: metaState.days, p_mode: metaState.mode };
+    const nation = metaState.nation === 'all' ? null : metaState.nation;
+    let res;
+    try {
+      res = await Promise.all([
+        acct.sb.rpc('meta_nations', args),
+        acct.sb.rpc('meta_vanguards', Object.assign({ p_nation: nation }, args)),
+        acct.sb.rpc('meta_cards', Object.assign({ p_nation: nation }, args))
+      ]);
+    } catch (e) { res = [{ error: e }]; }
+    if (seq !== metaState.seq) return;
+    box.removeAttribute('aria-busy');
+    const bad = res.find(r => r.error);
+    if (bad) { metaEmpty('Could not load the stats: ' + esc(authErr(bad.error)) + ' <button class="linkbtn" id="meta-retry">Try again</button>'); $('#meta-retry').onclick = renderMeta; return; }
+    const [nats, vans, cards] = res.map(r => r.data || []);
+    const total = nats.reduce((s, n) => s + Number(n.matches), 0);
+    const players = nats.reduce((s, n) => s + Number(n.players), 0);
+    if (!total) return metaEmpty('No matches recorded in this period yet. Sign in and finish a match: it shows up here right away.');
+    const scope = nation ? NAT_NAME[nation] : 'all nations';
+    const nationBars = nats.map(n => '<button class="bar" data-n="' + esc(n.nation) + '" aria-pressed="' + (n.nation === metaState.nation) + '" title="' + esc(NAT_NAME[n.nation] || n.nation) + ': ' + pct(n.share) + ' of matches (' + num(n.matches) + ')">' +
+      '<span class="bl"><span class="dot n-' + esc(n.nation) + '" aria-hidden="true"></span><span>' + esc(NAT_NAME[n.nation] || n.nation) + '</span></span>' +
+      '<span class="track"><span class="fill" style="display:block;width:' + Math.max(0, Math.min(100, Number(n.share))) + '%"></span></span><span class="v">' + pct(n.share) + '</span>' +
+      '<span class="sub">' + num(n.matches) + ' match' + (Number(n.matches) === 1 ? '' : 'es') + ' · ' + num(n.players) + ' player' + (Number(n.players) === 1 ? '' : 's') + (n.win_rate == null ? '' : ' · ' + pct(n.win_rate) + ' wins') + '</span></button>').join('');
+    const vanRows = vans.filter(v => CARDS[v.vanguard]).map(v => '<div class="vrow" title="' + esc(CARDS[v.vanguard].name) + ': ' + pct(v.share) + ' of ' + esc(scope) + '">' +
+      '<div>' + cardHTML(v.vanguard) + '</div><div style="min-width:0"><h4>' + esc(CARDS[v.vanguard].name) + '</h4><span class="muted" style="font-size:12px">' + esc(NAT_NAME[v.nation] || v.nation) + ' · ' + num(v.matches) + ' match' + (Number(v.matches) === 1 ? '' : 'es') + '</span>' +
+      '<div class="track"><div class="fill" style="width:' + Math.max(0, Math.min(100, Number(v.share))) + '%"></div></div></div>' +
+      '<div class="v"><b>' + pct(v.share) + '</b>' + (v.win_rate == null ? '' : pct(v.win_rate) + ' wins') + '</div></div>').join('');
+    const cardTiles = cards.filter(c => CARDS[c.card]).map(c => '<div class="ctile" title="' + esc(CARDS[c.card].name) + ': in ' + pct(c.inclusion) + ' of decks, ' + Number(c.avg_copies).toLocaleString('en-US') + ' copies on average">' +
+      '<div class="pc" data-info="' + esc(c.card) + '" style="cursor:pointer">' + cardHTML(c.card) + '</div><b>' + pct(c.inclusion) + '</b><span>' + Number(c.avg_copies).toLocaleString('en-US') + '× avg</span></div>').join('');
+    box.innerHTML = '<div class="meta-grid">' +
+      '<section class="panel stack"><div><h3>Nations</h3><p class="muted small" style="margin:2px 0 0">Share of ' + num(total) + ' recorded match' + (total === 1 ? '' : 'es') + ' · tap a nation to filter</p></div><div class="bars">' + nationBars + '</div></section>' +
+      '<section class="panel stack"><div><h3>Top vanguards</h3><p class="muted small" style="margin:2px 0 0">Grade 3 of the ride deck · ' + esc(scope) + '</p></div><div class="vlist">' + (vanRows || '<p class="muted" style="margin:0">No matches for this nation yet.</p>') + '</div></section>' +
+      '</div><section class="panel stack meta-wide"><div><h3>Most played cards</h3><p class="muted small" style="margin:2px 0 0">Share of decks running the card and average copies · ' + esc(scope) + '</p></div>' +
+      (cardTiles ? '<div class="ctiles">' + cardTiles + '</div>' : '<p class="muted" style="margin:0">No matches for this nation yet.</p>') + '</section>' +
+      '<p class="muted small" style="margin:12px 0 0">' + num(players) + ' player' + (players === 1 ? '' : 's') + ' counted. Win rates against the bot say more about the bot than about the deck; online results will be separated as soon as online play opens.</p>';
+  }
+  $('#meta-days').addEventListener('change', e => { metaState.days = +e.target.value; renderMeta(); });
+  $('#meta-mode').addEventListener('change', e => { metaState.mode = e.target.value; renderMeta(); });
+  document.querySelectorAll('#meta-nation button').forEach(b => b.addEventListener('click', () => { metaState.nation = b.dataset.f; renderMeta(); }));
+  $('#meta-body').addEventListener('click', e => {
+    const bar = e.target.closest('.bar[data-n]');
+    if (bar) { metaState.nation = metaState.nation === bar.dataset.n ? 'all' : bar.dataset.n; renderMeta(); return; }
+    const inf = e.target.closest('[data-info]');
+    if (inf && CARDS[inf.dataset.info]) { const d = CARDS[inf.dataset.info]; openSheet('<div style="display:grid;grid-template-columns:110px minmax(0,1fr);gap:12px"><div>' + cardHTML(d.id) + '</div><div><h3>' + esc(d.name) + '</h3><p class="muted">' + esc(d.set + '/' + d.no) + '</p><p style="white-space:pre-line">' + esc(d.text) + '</p></div></div><button class="btn" id="ix">Close</button>'); $('#ix').onclick = closeSheet; }
+  });
+  acct.ready = initOnline();
 
   window.__dv = { get game() { return G; }, answer: v => answer(v) };
   route();
